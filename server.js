@@ -29,9 +29,11 @@ app.use(express.json());
 
 // ── GET /api/config ─────────────────────────────────────────
 app.get('/api/config', (_req, res) => {
+  const devEmails = (process.env.DEV_EMAILS ?? '').split(',').map(e => e.trim()).filter(Boolean);
   res.json({
     supabaseUrl:     process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    devEmails,  // sent to frontend (not sensitive — just used for UI badge)
   });
 });
 
@@ -226,6 +228,20 @@ app.post('/chat', requireAuth, async (req, res) => {
   }
 
   res.end();
+});
+
+// ── GET /api/dev/stats ──────────────────────────────────────
+app.get('/api/dev/stats', requireAuth, async (req, res) => {
+  const devEmails = (process.env.DEV_EMAILS ?? '').split(',').map(e => e.trim()).filter(Boolean);
+  if (!devEmails.includes(req.user.email)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  // Get basic stats from Supabase
+  const [{ count: userCount }, { count: charCount }] = await Promise.all([
+    supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('characters').select('*', { count: 'exact', head: true }),
+  ]);
+  res.json({ userCount, charCount, devEmails: devEmails.length, maxDevAccounts: 3 });
 });
 
 // ── Health check ────────────────────────────────────────────

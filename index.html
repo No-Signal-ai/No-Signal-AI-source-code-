@@ -10,75 +10,110 @@
 <body>
   <div id="app">
 
-    <!-- Mobile sidebar overlay (Feature 2) -->
     <div id="sidebar-overlay"></div>
 
-    <!-- Sidebar -->
-    <aside id="sidebar">
-      <div id="logo">
-        <span class="logo-icon">◈</span>
-        <span class="logo-text">NO-SIGNAL</span>
+    <!-- Left icon nav -->
+    <nav id="left-nav">
+      <div id="nav-logo">◈</div>
+      <div id="nav-items">
+        <button class="nav-item active" data-section="chats" title="Conversations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span class="nav-label">Chats</span>
+        </button>
+        <button class="nav-item" data-section="characters" title="Mes personnages">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span class="nav-label">Personnages</span>
+        </button>
+        <button class="nav-item" data-section="discover" title="Découvrir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+          <span class="nav-label">Découvrir</span>
+        </button>
       </div>
-
-      <!-- Sidebar tabs: My chars / Discover -->
-      <div class="sidebar-tabs">
-        <button class="sidebar-tab active" id="tab-mine">My chars</button>
-        <button class="sidebar-tab" id="tab-discover">Discover</button>
+      <div id="nav-bottom">
+        <button class="nav-item" data-section="profile" title="Profil & Paramètres">
+          <div id="nav-user-avatar"></div>
+          <span class="nav-label">Profil</span>
+        </button>
       </div>
+    </nav>
 
-      <!-- My characters section -->
-      <div id="section-mine">
-        <div id="character-panel">
-          <h3>Active Character</h3>
-          <div id="character-card">
-            <div id="character-avatar">?</div>
-            <div id="character-info">
-              <span id="character-name">No character</span>
-              <span id="character-status">Select or create one</span>
-            </div>
-          </div>
-          <div id="my-chars-list"></div>
-          <button id="btn-new-character" class="btn-secondary">+ New character</button>
+    <!-- Left panel (content changes based on nav) -->
+    <div id="left-panel">
+
+      <!-- Panel: Chats -->
+      <div id="panel-chats" class="panel-section">
+        <div class="panel-header">
+          <h2>Conversations</h2>
+          <button id="btn-new-session" class="btn-panel-action" title="Nouvelle session">+</button>
         </div>
+        <!-- Active character display -->
+        <div id="character-card">
+          <div id="character-avatar">?</div>
+          <div id="character-info">
+            <span id="character-name">Aucun personnage</span>
+            <span id="character-status">Sélectionnez-en un</span>
+          </div>
+        </div>
+        <!-- Session list -->
+        <ul id="session-list"></ul>
       </div>
 
-      <!-- Community / Discover section -->
-      <div id="section-discover" class="hidden">
-        <h3>Community Characters</h3>
-        <!-- Feature 5: search and tag filters -->
+      <!-- Panel: Characters -->
+      <div id="panel-characters" class="panel-section hidden">
+        <div class="panel-header">
+          <h2>Mes personnages</h2>
+          <button id="btn-new-character" class="btn-panel-action" title="Nouveau personnage">+</button>
+        </div>
+        <div id="my-chars-list"></div>
+      </div>
+
+      <!-- Panel: Discover -->
+      <div id="panel-discover" class="panel-section hidden">
+        <div class="panel-header">
+          <h2>Découvrir</h2>
+        </div>
         <div id="discover-search">
-          <input type="text" id="search-input" placeholder="Search characters..." />
+          <input type="text" id="search-input" placeholder="Rechercher..." />
           <div id="tag-filters"></div>
         </div>
         <div id="community-list"></div>
       </div>
 
-      <div id="session-panel">
-        <h3>Sessions</h3>
-        <ul id="session-list">
-          <!-- Sessions injected by JS -->
-        </ul>
-        <button id="btn-new-session" class="btn-secondary">+ New session</button>
+      <!-- Panel: Profile -->
+      <div id="panel-profile" class="panel-section hidden">
+        <div class="panel-header">
+          <h2>Profil</h2>
+        </div>
+        <div id="profile-card">
+          <div id="profile-avatar-large"></div>
+          <div id="profile-info">
+            <span id="profile-username"></span>
+            <span id="profile-email"></span>
+            <span id="dev-badge" class="hidden">DEV</span>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button id="btn-settings-open" class="btn-profile-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Paramètres
+          </button>
+          <a href="/subscribe.html" class="btn-profile-action support-btn">
+            ✦ Soutenir le projet
+          </a>
+          <button id="btn-dev-panel" class="btn-profile-action dev-only hidden">
+            ⚙ Panneau Dev
+          </button>
+          <button id="btn-logout" class="btn-profile-action danger-btn">
+            Déconnexion
+          </button>
+        </div>
       </div>
 
-      <!-- User bar at the bottom of sidebar -->
-      <div id="user-bar">
-        <div id="user-avatar-small"></div>
-        <div id="user-info">
-          <span id="user-username">...</span>
-          <span id="user-email-small"></span>
-        </div>
-        <a href="/subscribe.html" id="btn-support" class="btn-icon" title="Soutenir le projet">✦</a>
-        <button id="btn-settings-open" class="btn-icon" title="Settings">⚙</button>
-        <button id="btn-logout" class="btn-icon" title="Sign out">⏻</button>
-      </div>
-    </aside>
+    </div>
 
     <!-- Main chat area -->
     <main id="chat-area">
       <header id="chat-header">
-        <!-- Feature 2: hamburger menu button (hidden on desktop) -->
-        <button id="btn-menu" class="btn-icon" title="Menu">☰</button>
         <span id="chat-title">Select a session</span><span id="model-badge-header"></span>
         <div id="header-actions">
           <button id="btn-memory" class="btn-icon" title="View memory">🧠</button>
@@ -174,6 +209,7 @@
           <button class="settings-tab active" data-stab="profile">Profile</button>
           <button class="settings-tab" data-stab="persona">My Persona</button>
           <button class="settings-tab" data-stab="model">Model</button>
+          <button class="settings-tab" data-stab="appearance">Apparence</button>
         </div>
 
         <!-- Profile tab -->
@@ -239,6 +275,41 @@
               <span class="model-badge beta">Beta</span>
             </label>
           </div>
+        </div>
+
+        <!-- Appearance tab -->
+        <div class="settings-section hidden" id="stab-appearance">
+          <label>Fond du chat</label>
+          <div id="bg-presets">
+            <button class="bg-preset-btn active" data-bg="none" title="Aucun">
+              <span class="bg-preview" style="background:var(--bg-base)"></span>
+              <span>Défaut</span>
+            </button>
+            <button class="bg-preset-btn" data-bg="aurora" title="Aurora">
+              <span class="bg-preview" style="background:linear-gradient(135deg,#0d1b2a,#1a0a2e,#0a1628)"></span>
+              <span>Aurora</span>
+            </button>
+            <button class="bg-preset-btn" data-bg="nebula" title="Nébuleuse">
+              <span class="bg-preview" style="background:linear-gradient(135deg,#0f0c29,#302b63,#24243e)"></span>
+              <span>Nébuleuse</span>
+            </button>
+            <button class="bg-preset-btn" data-bg="forest" title="Forêt">
+              <span class="bg-preview" style="background:linear-gradient(135deg,#0a0f0a,#1a2f1a,#0a1510)"></span>
+              <span>Forêt</span>
+            </button>
+            <button class="bg-preset-btn" data-bg="ocean" title="Océan">
+              <span class="bg-preview" style="background:linear-gradient(135deg,#0a0e1a,#0d1b3e,#0a1520)"></span>
+              <span>Océan</span>
+            </button>
+            <button class="bg-preset-btn" data-bg="ember" title="Braise">
+              <span class="bg-preview" style="background:linear-gradient(135deg,#1a0a0a,#2f1010,#1a0808)"></span>
+              <span>Braise</span>
+            </button>
+          </div>
+          <label style="margin-top:8px">Image personnalisée
+            <input type="file" id="bg-upload" accept="image/*" style="margin-top:4px" />
+          </label>
+          <div id="bg-preview-current" style="display:none;margin-top:8px;border-radius:8px;overflow:hidden;height:80px;background-size:cover;background-position:center;border:1px solid var(--border)"></div>
         </div>
 
         <div class="modal-actions">

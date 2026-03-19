@@ -1,6 +1,9 @@
 // ══════════════════════════════════════════════════════════
 // CONFIG & SUPABASE
 // ══════════════════════════════════════════════════════════
+// Supabase SQL: ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bg_preset text default 'none';
+// Supabase SQL: ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bg_custom_url text default '';
+
 const BACKEND_URL = '';
 let sb = null; // Supabase client
 
@@ -24,23 +27,33 @@ const TIPS = [
   "Survolez un message pour l'éditer ou régénérer la réponse.",
 ];
 
+const BG_GRADIENTS = {
+  none:   '',
+  aurora: 'linear-gradient(135deg,#0d1b2a,#1a0a2e,#0a1628)',
+  nebula: 'linear-gradient(135deg,#0f0c29,#302b63,#24243e)',
+  forest: 'linear-gradient(135deg,#0a0f0a,#1a2f1a,#0a1510)',
+  ocean:  'linear-gradient(135deg,#0a0e1a,#0d1b3e,#0a1520)',
+  ember:  'linear-gradient(135deg,#1a0a0a,#2f1010,#1a0808)',
+};
+
 // ══════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════
 const state = {
   user: null,            // Supabase user object
-  profile: null,         // { username, bio, avatar_color, persona_name, persona_desc }
+  profile: null,         // { username, bio, avatar_color, persona_name, persona_desc, bg_preset, bg_custom_url }
   characters: [],        // user's own characters from Supabase
   community: [],         // public characters from other users
   sessions: [],          // [{ id, name, characterId, messages: [] }] - localStorage
   activeSession: null,
   activeCharacter: null, // the selected character object
-  activeTab: 'mine',     // 'mine' | 'discover'
   isWaiting: false,
   allTags: [],           // all unique tags from community characters
   searchQuery: '',       // current community search query
   activeTag: null,       // currently filtered tag
   modelKey: localStorage.getItem('nosignal_model') ?? 'aurora-70',
+  isDevAccount: false,
+  devEmails: [],
 };
 
 // ══════════════════════════════════════════════════════════
@@ -53,9 +66,10 @@ const $ = id => document.getElementById(id);
 // ══════════════════════════════════════════════════════════
 async function initSupabase() {
   const res = await fetch('/api/config');
-  const { supabaseUrl, supabaseAnonKey } = await res.json();
+  const { supabaseUrl, supabaseAnonKey, devEmails } = await res.json();
   sb = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
   window.sb = sb;
+  state.devEmails = devEmails ?? [];
 }
 
 // ══════════════════════════════════════════════════════════
@@ -68,6 +82,7 @@ async function checkAuth() {
     return;
   }
   state.user = data.session.user;
+  state.isDevAccount = state.devEmails.includes(state.user.email);
 }
 
 async function logout() {
@@ -94,6 +109,8 @@ async function loadProfile() {
       avatar_color: '#7c6af7',
       persona_name: '',
       persona_desc: '',
+      bg_preset: 'none',
+      bg_custom_url: '',
     };
     const { data: created, error: createErr } = await sb
       .from('profiles')
@@ -592,6 +609,20 @@ function enableMessageEditing(div, _role, msgIndex) {
 }
 
 // ══════════════════════════════════════════════════════════
+// BACKGROUND
+// ══════════════════════════════════════════════════════════
+function applyBackground(bgPreset, bgCustomUrl) {
+  const chatArea = $('chat-area');
+  if (bgCustomUrl) {
+    chatArea.style.backgroundImage = `url(${bgCustomUrl})`;
+  } else if (bgPreset && bgPreset !== 'none' && BG_GRADIENTS[bgPreset]) {
+    chatArea.style.backgroundImage = BG_GRADIENTS[bgPreset];
+  } else {
+    chatArea.style.backgroundImage = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // SETTINGS MODAL
 // ══════════════════════════════════════════════════════════
 function openSettings() {
@@ -610,6 +641,24 @@ function openSettings() {
   // Set the correct model radio button
   const modelRadio = document.querySelector(`input[name="model-select"][value="${state.modelKey}"]`);
   if (modelRadio) modelRadio.checked = true;
+
+  // Mark active bg preset
+  const activeBg = profile.bg_preset ?? 'none';
+  document.querySelectorAll('.bg-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.bg === activeBg);
+  });
+
+  // Show current custom URL preview if any
+  const bgPreviewCurrent = $('bg-preview-current');
+  if (profile.bg_custom_url) {
+    bgPreviewCurrent.style.backgroundImage = `url(${profile.bg_custom_url})`;
+    bgPreviewCurrent.style.display = 'block';
+  } else {
+    bgPreviewCurrent.style.display = 'none';
+  }
+
+  // Reset bg-upload
+  $('bg-upload').value = '';
 
   // Reset to profile tab
   switchSettingsTab('profile');
@@ -632,12 +681,39 @@ async function saveSettings() {
     localStorage.setItem('nosignal_model', selectedModel);
   }
 
+  // Background: check if a file was uploaded
+  const bgUploadFile = $('bg-upload').files?.[0] ?? null;
+  const selectedBgBtn = document.querySelector('.bg-preset-btn.active');
+  const bg_preset = selectedBgBtn?.dataset.bg ?? 'none';
+
+  let bg_custom_url = state.profile?.bg_custom_url ?? '';
+
   const btn = $('btn-save-settings');
   btn.disabled = true;
   btn.textContent = 'Saving...';
 
   try {
-    await saveProfile({ username, bio, avatar_color, persona_name, persona_desc });
+    if (bgUploadFile) {
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await sb.storage
+        .from('backgrounds')
+        .upload(`${state.user.id}/${Date.now()}`, bgUploadFile, { upsert: true });
+
+      if (uploadError) {
+        console.error('Background upload failed:', uploadError);
+      } else {
+        const { data: urlData } = sb.storage
+          .from('backgrounds')
+          .getPublicUrl(uploadData.path);
+        bg_custom_url = urlData?.publicUrl ?? '';
+      }
+    } else if (bg_preset !== 'none') {
+      // If a preset was selected, clear the custom URL
+      bg_custom_url = '';
+    }
+
+    await saveProfile({ username, bio, avatar_color, persona_name, persona_desc, bg_preset, bg_custom_url });
+    applyBackground(bg_preset, bg_custom_url);
     $('modal-settings').classList.add('hidden');
     renderUserBar();
     renderModelBadge();
@@ -702,6 +778,23 @@ function renderGreeting() {
 }
 
 // ══════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════
+function switchNav(section) {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.section === section);
+  });
+  document.querySelectorAll('.panel-section').forEach(panel => {
+    panel.classList.toggle('hidden', panel.id !== `panel-${section}`);
+  });
+  // On mobile: open/close the left panel
+  if (window.innerWidth <= 768) {
+    $('left-panel').classList.add('mobile-open');
+    $('sidebar-overlay').classList.add('visible');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════════════
 function renderUserBar() {
@@ -709,12 +802,31 @@ function renderUserBar() {
   const initial = (profile?.username ?? state.user?.email ?? '?')[0].toUpperCase();
   const color   = profile?.avatar_color ?? '#7c6af7';
 
-  const avatar = $('user-avatar-small');
-  avatar.textContent = initial;
-  avatar.style.background = color;
+  // Nav user avatar
+  const navAvatar = $('nav-user-avatar');
+  if (navAvatar) {
+    navAvatar.textContent = initial;
+    navAvatar.style.background = color;
+  }
 
-  $('user-username').textContent   = profile?.username ?? 'User';
-  $('user-email-small').textContent = state.user?.email ?? '';
+  // Profile panel
+  const profileAvatarLarge = $('profile-avatar-large');
+  if (profileAvatarLarge) {
+    profileAvatarLarge.textContent = initial;
+    profileAvatarLarge.style.background = color;
+  }
+  const profileUsername = $('profile-username');
+  if (profileUsername) profileUsername.textContent = profile?.username ?? 'Utilisateur';
+  const profileEmail = $('profile-email');
+  if (profileEmail) profileEmail.textContent = state.user?.email ?? '';
+
+  // Dev badge
+  if (state.isDevAccount) {
+    $('dev-badge').classList.remove('hidden');
+    $('btn-dev-panel').classList.remove('hidden');
+    // Also highlight the nav avatar
+    if (navAvatar) navAvatar.style.boxShadow = '0 0 0 2px #7c6af7';
+  }
 }
 
 function renderCharacterList() {
@@ -787,7 +899,7 @@ function renderCharacterList() {
   });
 }
 
-// ── Feature 5: filter community by search + tag ────────────
+// ── Filter community by search + tag ────────────
 function filterCommunity() {
   let list = state.community;
 
@@ -861,7 +973,7 @@ function renderCommunity() {
   });
 }
 
-// ── Feature 4: render sessions with rename/delete ──────────
+// ── Render sessions with rename/delete ──────────
 function renderSessions() {
   const list = $('session-list');
   list.innerHTML = '';
@@ -963,8 +1075,8 @@ function renderActiveCharacter() {
       $('character-avatar').textContent = char.name[0].toUpperCase();
     }
   } else {
-    $('character-name').textContent   = 'No character';
-    $('character-status').textContent = 'Select or create one';
+    $('character-name').textContent   = 'Aucun personnage';
+    $('character-status').textContent = 'Sélectionnez-en un';
     $('character-avatar').textContent = '?';
   }
 }
@@ -1121,6 +1233,18 @@ function openMemoryModal() {
 }
 
 // ══════════════════════════════════════════════════════════
+// DEV PANEL
+// ══════════════════════════════════════════════════════════
+async function openDevPanel() {
+  const { data: { session: authSession } } = await sb.auth.getSession();
+  const res = await fetch('/api/dev/stats', {
+    headers: { Authorization: `Bearer ${authSession?.access_token}` }
+  });
+  const stats = await res.json();
+  alert(`Stats NO-SIGNAL\n\nUtilisateurs: ${stats.userCount}\nPersonnages: ${stats.charCount}\nComptes dev: ${stats.devEmails}/${stats.maxDevAccounts}`);
+}
+
+// ══════════════════════════════════════════════════════════
 // UTILITIES
 // ══════════════════════════════════════════════════════════
 function escapeHtml(str) {
@@ -1149,7 +1273,18 @@ function initEvents() {
   });
   $('user-input').addEventListener('input', autoResize);
 
-  // Sidebar buttons
+  // Nav items
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => switchNav(item.dataset.section));
+  });
+
+  // Mobile overlay close
+  $('sidebar-overlay').addEventListener('click', () => {
+    $('left-panel').classList.remove('mobile-open');
+    $('sidebar-overlay').classList.remove('visible');
+  });
+
+  // Panel buttons
   $('btn-new-session').addEventListener('click', () => {
     if (!state.activeCharacter) {
       alert('Select a character first before starting a session.');
@@ -1159,16 +1294,16 @@ function initEvents() {
   });
   $('btn-new-character').addEventListener('click', () => openCharacterModal());
 
-  // Sidebar tabs
-  $('tab-mine').addEventListener('click', () => switchSidebarTab('mine'));
-  $('tab-discover').addEventListener('click', () => switchSidebarTab('discover'));
+  // Character card in chats panel: navigate to characters section
+  $('character-card').addEventListener('click', () => switchNav('characters'));
 
   // Header
   $('btn-memory').addEventListener('click', openMemoryModal);
 
-  // User bar
+  // Profile panel buttons
   $('btn-logout').addEventListener('click', logout);
   $('btn-settings-open').addEventListener('click', openSettings);
+  $('btn-dev-panel').addEventListener('click', openDevPanel);
 
   // Character modal
   $('btn-save-character').addEventListener('click', saveCharacterModal);
@@ -1200,6 +1335,28 @@ function initEvents() {
     });
   });
 
+  // Background preset buttons
+  document.querySelectorAll('.bg-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bg-preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // Clear custom URL preview if switching to preset
+      $('bg-preview-current').style.display = 'none';
+    });
+  });
+
+  // Background file upload
+  $('bg-upload').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const preview = $('bg-preview-current');
+    preview.style.backgroundImage = `url(${url})`;
+    preview.style.display = 'block';
+    // Deselect presets
+    document.querySelectorAll('.bg-preset-btn').forEach(b => b.classList.remove('active'));
+  });
+
   // Close modals on backdrop click
   [$('modal-character'), $('modal-memory'), $('modal-settings'), $('modal-welcome')].forEach(modal => {
     if (!modal) return;
@@ -1208,23 +1365,13 @@ function initEvents() {
     });
   });
 
-  // Feature 2: Mobile sidebar toggle
-  $('btn-menu').addEventListener('click', () => {
-    $('sidebar').classList.toggle('open');
-    $('sidebar-overlay').classList.toggle('visible');
-  });
-  $('sidebar-overlay').addEventListener('click', () => {
-    $('sidebar').classList.remove('open');
-    $('sidebar-overlay').classList.remove('visible');
-  });
-
-  // Feature 5: Community search input
+  // Community search input
   $('search-input').addEventListener('input', e => {
     state.searchQuery = e.target.value.trim();
     renderCommunity();
   });
 
-  // Feature 5: Tag filter chip clicks (event delegation)
+  // Tag filter chip clicks (event delegation)
   $('tag-filters').addEventListener('click', e => {
     const chip = e.target.closest('.tag-chip');
     if (!chip) return;
@@ -1232,14 +1379,6 @@ function initEvents() {
     state.activeTag = state.activeTag === tag ? null : tag;
     renderCommunity();
   });
-}
-
-function switchSidebarTab(tab) {
-  state.activeTab = tab;
-  $('tab-mine').classList.toggle('active', tab === 'mine');
-  $('tab-discover').classList.toggle('active', tab === 'discover');
-  $('section-mine').classList.toggle('hidden', tab !== 'mine');
-  $('section-discover').classList.toggle('hidden', tab !== 'discover');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1260,6 +1399,9 @@ async function init() {
   renderModelBadge();
   renderGreeting();
   showWelcomeIfNeeded();
+
+  // Apply saved background
+  applyBackground(state.profile?.bg_preset, state.profile?.bg_custom_url);
 
   if (state.activeSession) {
     activateSession(state.activeSession);
