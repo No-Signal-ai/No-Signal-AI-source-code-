@@ -262,11 +262,8 @@ async function callAI(session) {
     if (!res.ok) throw new Error(`Server error ${res.status}`);
     const data = await res.json();
     return data.reply;
-  } catch {
-    // Backend not ready yet — return a placeholder so the UI is testable
-    await sleep(900);
-    const char = state.character?.name ?? 'AI';
-    return `[${char} — backend not connected yet. Implement /chat to enable real responses.]`;
+  } catch (err) {
+    throw new Error(`Cannot reach /chat: ${err.message}`);
   }
 }
 
