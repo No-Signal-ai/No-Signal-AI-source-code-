@@ -1,7 +1,7 @@
 // ── Config ─────────────────────────────────────────────────
-// In development: backend runs on localhost:3000
-// In production: set this to your deployed backend URL (Railway, Render, etc.)
-const BACKEND_URL = 'http://localhost:3000';
+// Empty string = same origin (works both locally and on Railway)
+// If the frontend is on a separate domain, set this to the full backend URL.
+const BACKEND_URL = '';
 
 // ── State ──────────────────────────────────────────────────
 const state = {

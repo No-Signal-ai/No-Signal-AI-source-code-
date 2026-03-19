@@ -1,13 +1,14 @@
 import express from 'express';
-import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Middleware ─────────────────────────────────────────────
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN ?? '*', // set to your GitHub Pages URL in prod
-}));
+// Serve frontend static files (index.html, style.css, app.js)
+app.use(express.static(__dirname));
 app.use(express.json());
 
 // ── Build system prompt from character ────────────────────
