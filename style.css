@@ -410,13 +410,52 @@ body {
 /* ── Input area ───────────────────────────────────────────── */
 #input-area {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  padding: 14px 20px;
+  flex-direction: column;
+  padding: 10px 20px 14px;
   border-top: 1px solid var(--border);
   background: var(--bg-base);
   flex-shrink: 0;
+  gap: 6px;
 }
+
+#input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+#attach-preview {
+  padding: 6px 0;
+}
+#attach-preview.hidden { display: none; }
+.attach-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.attach-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+.attach-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.btn-attach-file {
+  width: 36px; height: 36px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-attach-file:hover:not(:disabled) { border-color: var(--accent); background: var(--bg-hover); }
+.btn-attach-file:disabled { opacity: 0.3; cursor: not-allowed; }
 
 #user-input {
   flex: 1;

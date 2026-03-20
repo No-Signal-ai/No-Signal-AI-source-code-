@@ -160,18 +160,23 @@
       </div>
 
       <div id="input-area">
-        <textarea
-          id="user-input"
-          placeholder="Write your message..."
-          rows="1"
-          disabled
-        ></textarea>
-        <button id="btn-send" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
+        <div id="attach-preview" class="hidden"></div>
+        <div id="input-row">
+          <button id="btn-attach" class="btn-icon btn-attach-file" title="Joindre une image" disabled>📎</button>
+          <input type="file" id="file-input" accept="image/*" style="display:none" />
+          <textarea
+            id="user-input"
+            placeholder="Écrivez votre message..."
+            rows="1"
+            disabled
+          ></textarea>
+          <button id="btn-send" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
       </div>
     </main>
 
@@ -293,13 +298,28 @@
                 <span class="model-desc">Fastest · Great for quick chats</span>
               </div>
             </label>
+            <label class="model-option" data-model="lumina">
+              <input type="radio" name="model-select" value="lumina" />
+              <div class="model-info">
+                <span class="model-name">LUMINA</span>
+                <span class="model-desc">Ultra-rapide · Conversations légères</span>
+              </div>
+            </label>
+            <label class="model-option" data-model="vision-90">
+              <input type="radio" name="model-select" value="vision-90" />
+              <div class="model-info">
+                <span class="model-name">VISION-90</span>
+                <span class="model-desc">👁 Supporte les images · Analyse visuelle</span>
+              </div>
+              <span class="model-badge beta">Vision</span>
+            </label>
             <label class="model-option" data-model="stellar">
               <input type="radio" name="model-select" value="stellar" />
               <div class="model-info">
                 <span class="model-name">STELLAR</span>
-                <span class="model-desc">Experimental · Different perspective</span>
+                <span class="model-desc">👁 Google AI · Images + longues conversations</span>
               </div>
-              <span class="model-badge beta">Beta</span>
+              <span class="model-badge beta">Vision</span>
             </label>
           </div>
         </div>

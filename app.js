@@ -14,6 +14,8 @@ const MODEL_DISPLAY_NAMES = {
   'aurora-70': 'AURORA-70',
   'prism':     'PRISM-8X',
   'swift':     'SWIFT',
+  'lumina':    'LUMINA',
+  'vision-90': 'VISION-90',
   'stellar':   'STELLAR',
 };
 
@@ -51,11 +53,15 @@ const state = {
   allTags: [],           // all unique tags from community characters
   searchQuery: '',       // current community search query
   activeTag: null,       // currently filtered tag
-  modelKey: localStorage.getItem('nosignal_model') ?? 'aurora-70',
-  isDevAccount: false,
-  devEmails: [],
-  devBadgeConfig: {},
-  announcements: [],
+  modelKey:        localStorage.getItem('nosignal_model') ?? 'aurora-70',
+  isDevAccount:    false,
+  devEmails:       [],
+  devBadgeConfig:  {},
+  announcements:   [],
+  ragEnabled:      false,
+  modelVision:     {}, // { key: bool } from config
+  attachedFile:    null,
+  attachedImageUrl:null,
 };
 
 // ══════════════════════════════════════════════════════════
@@ -68,11 +74,15 @@ const $ = id => document.getElementById(id);
 // ══════════════════════════════════════════════════════════
 async function initSupabase() {
   const res = await fetch('/api/config');
-  const { supabaseUrl, supabaseAnonKey, devEmails, devBadgeConfig } = await res.json();
-  sb = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+  const cfg = await res.json();
+  sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   window.sb = sb;
-  state.devEmails = devEmails ?? [];
-  state.devBadgeConfig = devBadgeConfig ?? {};
+  state.devEmails    = cfg.devEmails    ?? [];
+  state.devBadgeConfig = cfg.devBadgeConfig ?? {};
+  state.ragEnabled   = cfg.ragEnabled   ?? false;
+  state.modelVision  = Object.fromEntries(
+    Object.entries(cfg.models ?? {}).map(([k, v]) => [k, v.vision ?? false])
+  );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -267,60 +277,94 @@ async function incrementInteractions(id) {
 }
 
 // ══════════════════════════════════════════════════════════
-// PERSISTENCE (localStorage for sessions)
-// ══════════════════════════════════════════════════════════
-function saveSessions() {
-  localStorage.setItem('nosignal_sessions', JSON.stringify({
-    sessions:      state.sessions,
-    activeSession: state.activeSession,
-  }));
-}
-
-function loadSessions() {
-  const raw = localStorage.getItem('nosignal_sessions');
-  if (!raw) return;
-  try {
-    const data = JSON.parse(raw);
-    state.sessions      = data.sessions      ?? [];
-    state.activeSession = data.activeSession ?? null;
-  } catch (e) {
-    console.error('Failed to parse sessions:', e);
-  }
-}
-
-// ══════════════════════════════════════════════════════════
-// SESSIONS
+// PERSISTENCE (Supabase for sessions/messages)
 // ══════════════════════════════════════════════════════════
 function getCurrentSession() {
   return state.sessions.find(s => s.id === state.activeSession) ?? null;
 }
 
-function createSession(character) {
-  const id   = crypto.randomUUID();
-  const name = `${character.name} — Session ${state.sessions.length + 1}`;
-  state.sessions.push({ id, name, characterId: character.id, messages: [] });
-  saveSessions();
-  renderSessions();
-  activateSession(id);
+async function loadSessions() {
+  const { data, error } = await sb
+    .from('chat_sessions')
+    .select('*')
+    .eq('user_id', state.user.id)
+    .order('updated_at', { ascending: false })
+    .limit(50);
+
+  if (error) { console.error('loadSessions error:', error); return; }
+  state.sessions = (data ?? []).map(s => ({ ...s, messages: [], _loaded: false }));
+
+  // Restore last active session
+  const lastId = localStorage.getItem('nosignal_active_session');
+  const found  = lastId && state.sessions.find(s => s.id === lastId);
+  if (found) {
+    await activateSession(lastId);
+  } else if (state.sessions.length > 0) {
+    await activateSession(state.sessions[0].id);
+  }
 }
 
-function activateSession(id) {
-  state.activeSession = id;
-  const session = getCurrentSession();
-  $('chat-title').textContent = session?.name ?? 'Session';
+async function createSession(character) {
+  const { data, error } = await sb.from('chat_sessions').insert({
+    user_id:            state.user.id,
+    character_id:       character.id,
+    character_snapshot: character,
+    name:               `${character.name} — Session ${state.sessions.length + 1}`,
+    summary:            '',
+  }).select().single();
 
-  // Restore the character for this session
-  if (session) {
-    const charId = session.characterId;
-    const char = [...state.characters, ...state.community].find(c => c.id === charId) ?? null;
-    state.activeCharacter = char;
+  if (error) { console.error('createSession error:', error); return; }
+  const session = { ...data, messages: [], _loaded: true };
+  state.sessions.unshift(session);
+  await activateSession(session.id);
+}
+
+async function activateSession(id) {
+  state.activeSession = id;
+  localStorage.setItem('nosignal_active_session', id);
+
+  const session = getCurrentSession();
+  if (!session) return;
+
+  $('chat-title').textContent = session.name ?? 'Session';
+
+  // Restore character from snapshot
+  if (session.character_snapshot) {
+    state.activeCharacter = session.character_snapshot;
     renderActiveCharacter();
+  }
+
+  // Load messages lazily
+  if (!session._loaded) {
+    const { data: msgs } = await sb
+      .from('chat_messages')
+      .select('id, role, content')
+      .eq('session_id', id)
+      .order('created_at', { ascending: true });
+    session.messages = msgs ?? [];
+    session._loaded  = true;
   }
 
   renderSessions();
   renderMessages();
-  setInputEnabled(!!session && !state.isWaiting);
-  saveSessions();
+  setInputEnabled(!state.isWaiting);
+}
+
+async function persistMessage(sessionId, role, content) {
+  const { data } = await sb.from('chat_messages')
+    .insert({ session_id: sessionId, role, content })
+    .select('id').single();
+  // Touch updated_at on session
+  await sb.from('chat_sessions')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', sessionId);
+  return data?.id;
+}
+
+async function updateSessionSummary(sessionId, summary) {
+  await sb.from('chat_sessions')
+    .update({ summary, updated_at: new Date().toISOString() })
+    .eq('id', sessionId);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -330,49 +374,64 @@ async function sendMessage() {
   if (state.isWaiting) return;
 
   const content = $('user-input').value.trim();
-  if (!content) return;
+  if (!content && !state.attachedImageUrl) return;
 
   const session = getCurrentSession();
   if (!session) return;
 
-  // Add user message
-  session.messages.push({ role: 'user', content });
+  const userContent = content || '📎 [image]';
+
+  // Add user message locally and persist
+  session.messages.push({ role: 'user', content: userContent });
   const userMsgIndex = session.messages.length - 1;
-  appendMessage('user', content, true, userMsgIndex);
+  appendMessage('user', userContent, true, userMsgIndex);
   $('user-input').value = '';
   autoResize();
+
+  // Clear attachment UI
+  const attachedUrl = state.attachedImageUrl;
+  clearAttachment();
 
   state.isWaiting = true;
   setInputEnabled(false);
   showTypingIndicator();
-  saveSessions();
+
+  // Persist user message (fire & forget)
+  persistMessage(session.id, 'user', userContent);
 
   try {
     const { data: { session: authSession } } = await sb.auth.getSession();
     const token = authSession?.access_token;
-    const reply = await callAI(session, token);
+    const reply = await callAI(session, token, attachedUrl);
+
     session.messages.push({ role: 'assistant', content: reply });
+
+    // Persist assistant message
+    persistMessage(session.id, 'assistant', reply);
+
+    // Persist summary update if session has one
+    if (session.summary) {
+      updateSessionSummary(session.id, session.summary);
+    }
   } catch (err) {
     removeTypingIndicator();
-    appendMessage('assistant', `Error: ${err.message}`, true, session.messages.length);
+    appendMessage('assistant', `⚠️ Error: ${err.message}`, true, session.messages.length);
   }
 
   state.isWaiting = false;
   setInputEnabled(true);
   $('user-input').focus();
-  saveSessions();
 }
 
-async function callAI(session, token) {
+async function callAI(session, token, attachedImageUrl = null) {
   const payload = {
-    character:   state.activeCharacter,
-    messages:    session.messages,
-    summary:     session.summary ?? null,
-    userPersona: {
-      name: state.profile?.persona_name ?? '',
-      desc: state.profile?.persona_desc ?? '',
-    },
-    modelKey: state.modelKey,
+    character:        state.activeCharacter,
+    messages:         session.messages,
+    summary:          session.summary ?? null,
+    userPersona:      { name: state.profile?.persona_name ?? '', desc: state.profile?.persona_desc ?? '' },
+    modelKey:         state.modelKey,
+    sessionId:        session.id,
+    attachedImageUrl: attachedImageUrl ?? null,
   };
 
   const res = await fetch(`${BACKEND_URL}/chat`, {
@@ -1013,15 +1072,13 @@ function renderSessions() {
     renameBtn.className = 'btn-icon';
     renameBtn.title = 'Rename';
     renameBtn.textContent = '✏';
-    renameBtn.addEventListener('click', e => {
+    renameBtn.addEventListener('click', async e => {
       e.stopPropagation();
       const newName = prompt('Rename session:', session.name);
-      if (newName && newName.trim()) {
+      if (newName?.trim()) {
         session.name = newName.trim();
-        if (state.activeSession === session.id) {
-          $('chat-title').textContent = session.name;
-        }
-        saveSessions();
+        if (state.activeSession === session.id) $('chat-title').textContent = session.name;
+        await sb.from('chat_sessions').update({ name: session.name }).eq('id', session.id);
         renderSessions();
       }
     });
@@ -1030,18 +1087,19 @@ function renderSessions() {
     deleteBtn.className = 'btn-icon';
     deleteBtn.title = 'Delete';
     deleteBtn.textContent = '✕';
-    deleteBtn.addEventListener('click', e => {
+    deleteBtn.addEventListener('click', async e => {
       e.stopPropagation();
-      if (!confirm(`Delete session "${session.name}"?`)) return;
+      if (!confirm(`Supprimer la session "${session.name}" ?`)) return;
       const wasActive = state.activeSession === session.id;
+      await sb.from('chat_sessions').delete().eq('id', session.id);
       state.sessions = state.sessions.filter(s => s.id !== session.id);
       if (wasActive) {
         state.activeSession = null;
-        $('chat-title').textContent = 'Select a session';
+        localStorage.removeItem('nosignal_active_session');
+        $('chat-title').textContent = 'Sélectionnez une session';
         renderMessages();
         setInputEnabled(false);
       }
-      saveSessions();
       renderSessions();
     });
 
@@ -1096,6 +1154,74 @@ function renderActiveCharacter() {
     $('character-status').textContent = 'Sélectionnez-en un';
     $('character-avatar').textContent = '?';
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// FILE UPLOAD
+// ══════════════════════════════════════════════════════════
+async function uploadFile(file) {
+  // Validate model supports vision for images
+  const isImage = file.type.startsWith('image/');
+  if (isImage && !state.modelVision[state.modelKey]) {
+    const useVision = confirm(
+      `Le modèle actuel (${MODEL_DISPLAY_NAMES[state.modelKey]}) ne supporte pas les images.\nPasser sur STELLAR (Gemini) pour cette session ?`
+    );
+    if (!useVision) return;
+    state.modelKey = 'stellar';
+    localStorage.setItem('nosignal_model', 'stellar');
+    renderModelBadge();
+  }
+
+  const btn = $('btn-attach');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+  try {
+    const { data: { session: authSession } } = await sb.auth.getSession();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/upload', {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${authSession?.access_token}` },
+      body:    formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error ?? 'Upload failed');
+    }
+
+    const { url, type } = await res.json();
+    state.attachedImageUrl = url;
+    state.attachedFile     = file;
+
+    // Show preview
+    const previewEl = $('attach-preview');
+    if (previewEl) {
+      previewEl.innerHTML = `
+        <div class="attach-item">
+          ${type.startsWith('image/') ? `<img src="${url}" alt="attachment" class="attach-thumb"/>` : `<span class="attach-icon">📄</span>`}
+          <span class="attach-name">${escapeHtml(file.name)}</span>
+          <button class="btn-icon" id="btn-remove-attach" title="Remove">✕</button>
+        </div>`;
+      previewEl.classList.remove('hidden');
+      $('btn-remove-attach').addEventListener('click', clearAttachment);
+    }
+  } catch (err) {
+    console.error('Upload error:', err);
+    alert(`Erreur d'upload: ${err.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📎'; }
+  }
+}
+
+function clearAttachment() {
+  state.attachedFile     = null;
+  state.attachedImageUrl = null;
+  const previewEl = $('attach-preview');
+  if (previewEl) { previewEl.innerHTML = ''; previewEl.classList.add('hidden'); }
+  const fileInput = $('file-input');
+  if (fileInput) fileInput.value = '';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1177,7 +1303,10 @@ async function postAnnouncement() {
       },
       body: JSON.stringify({ content }),
     });
-    if (!res.ok) throw new Error('Failed to post');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error ?? `HTTP ${res.status}`);
+    }
     const ann = await res.json();
     state.announcements.unshift(ann);
     input.value = '';
@@ -1254,6 +1383,8 @@ function removeTypingIndicator() {
 function setInputEnabled(enabled) {
   $('user-input').disabled = !enabled;
   $('btn-send').disabled   = !enabled;
+  const attachBtn = $('btn-attach');
+  if (attachBtn) attachBtn.disabled = !enabled;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1503,6 +1634,17 @@ function initEvents() {
     renderCommunity();
   });
 
+  // File attachment
+  const fileInput = $('file-input');
+  const btnAttach = $('btn-attach');
+  if (btnAttach && fileInput) {
+    btnAttach.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) uploadFile(file);
+    });
+  }
+
   // Announcements compose
   $('btn-post-announce').addEventListener('click', postAnnouncement);
   $('announce-input').addEventListener('keydown', e => {
@@ -1525,7 +1667,7 @@ async function init() {
   await loadMyCharacters();
   await loadCommunity();
   await loadAnnouncements();
-  loadSessions();
+  await loadSessions();
   renderUserBar();
   renderCharacterList();
   renderCommunity();
@@ -1538,10 +1680,6 @@ async function init() {
 
   // Apply saved background
   applyBackground(state.profile?.bg_preset, state.profile?.bg_custom_url);
-
-  if (state.activeSession) {
-    activateSession(state.activeSession);
-  }
 
   initEvents();
 }
