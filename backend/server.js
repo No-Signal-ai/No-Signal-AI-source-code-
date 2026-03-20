@@ -7,7 +7,7 @@ import rateLimit       from 'express-rate-limit';
 import multer          from 'multer';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FRONTEND_DIR = resolve(__dirname, '../frontend');
+const FRONTEND_DIR = resolve(__dirname, 'public');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
