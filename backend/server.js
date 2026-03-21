@@ -430,4 +430,33 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
+// ── GET /api/characters ─────────────────────────────────────
+app.get('/api/characters', requireAuth, async (req, res) => {
+  const { data, error } = await supabaseAdmin
+    .from('characters')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data ?? []);
+});
+
+// ── POST /api/characters ────────────────────────────────────
+app.post('/api/characters', requireAuth, async (req, res) => {
+  const { name, personality = '', tone = '', lore = '', avatar_url = '' } = req.body;
+  if (!name?.trim())               return res.status(400).json({ error: 'Le nom est requis.' });
+  if (name.trim().length > 100)    return res.status(400).json({ error: 'Nom trop long (max 100).' });
+  if (personality.length > 1000)   return res.status(400).json({ error: 'Personnalité trop longue (max 1000).' });
+  if (tone.length > 1000)          return res.status(400).json({ error: 'Ton trop long (max 1000).' });
+  if (lore.length > 2000)          return res.status(400).json({ error: 'Lore trop long (max 2000).' });
+
+  const { data, error } = await supabaseAdmin
+    .from('characters')
+    .insert({ user_id: req.user.id, name: name.trim(), personality, tone, lore, avatar_url })
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
 app.listen(PORT, () => console.log(`NO-SIGNAL backend v2 running on port ${PORT}`));
