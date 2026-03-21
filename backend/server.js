@@ -448,7 +448,7 @@ app.post('/create-checkout-session', async (req, res) => {
 
 // ── GET /api/characters ─────────────────────────────────────
 app.get('/api/characters', requireAuth, async (req, res) => {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getUserClient(req)
     .from('characters')
     .select('*')
     .eq('creator_id', req.user.id)
