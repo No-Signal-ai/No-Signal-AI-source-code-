@@ -50,6 +50,15 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Per-request client that carries the user's JWT → satisfies RLS policies
+function getUserClient(req) {
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY,
+    { global: { headers: { Authorization: req.headers.authorization } } }
+  );
+}
+
 // ── Multer (file uploads, memory storage) ───────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -469,7 +478,7 @@ app.post('/api/characters', requireAuth, async (req, res) => {
     .eq('id', req.user.id)
     .single();
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getUserClient(req)
     .from('characters')
     .insert({ creator_id: req.user.id, creator_username: profile?.username ?? '', name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
     .select()
@@ -496,7 +505,7 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
   if (avatar_urlT.length > 500)                           return res.status(400).json({ error: 'URL avatar trop longue (max 500).' });
   if (avatar_urlT && !avatar_urlT.startsWith('https://')) return res.status(400).json({ error: 'URL avatar invalide.' });
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getUserClient(req)
     .from('characters')
     .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
     .eq('id', id)
@@ -511,7 +520,7 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
 // ── DELETE /api/characters/:id ──────────────────────────────
 app.delete('/api/characters/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getUserClient(req)
     .from('characters')
     .delete()
     .eq('id', id)
