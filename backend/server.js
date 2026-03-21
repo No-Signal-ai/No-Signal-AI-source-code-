@@ -464,4 +464,47 @@ app.post('/api/characters', requireAuth, async (req, res) => {
   res.status(201).json(data);
 });
 
+// ── PUT /api/characters/:id ─────────────────────────────────
+app.put('/api/characters/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { name, personality = '', tone = '', lore = '', avatar_url = '' } = req.body;
+  if (!name?.trim())               return res.status(400).json({ error: 'Le nom est requis.' });
+  if (name.trim().length > 100)    return res.status(400).json({ error: 'Nom trop long (max 100).' });
+
+  const personalityT = personality.trim();
+  const toneT        = tone.trim();
+  const loreT        = lore.trim();
+
+  if (personalityT.length > 1000)  return res.status(400).json({ error: 'Personnalité trop longue (max 1000).' });
+  if (toneT.length > 1000)         return res.status(400).json({ error: 'Ton trop long (max 1000).' });
+  if (loreT.length > 2000)         return res.status(400).json({ error: 'Lore trop long (max 2000).' });
+  if (avatar_url && avatar_url.length > 500)           return res.status(400).json({ error: 'URL avatar trop longue (max 500).' });
+  if (avatar_url && !avatar_url.startsWith('https://')) return res.status(400).json({ error: 'URL avatar invalide.' });
+
+  const { data, error } = await supabaseAdmin
+    .from('characters')
+    .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url })
+    .eq('id', id)
+    .eq('user_id', req.user.id)
+    .select()
+    .single();
+  if (error && error.code === 'PGRST116') return res.status(404).json({ error: 'Personnage introuvable.' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// ── DELETE /api/characters/:id ──────────────────────────────
+app.delete('/api/characters/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabaseAdmin
+    .from('characters')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', req.user.id)
+    .select();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data || data.length === 0) return res.status(404).json({ error: 'Personnage introuvable.' });
+  res.json({ success: true });
+});
+
 app.listen(PORT, () => console.log(`NO-SIGNAL backend v2 running on port ${PORT}`));
