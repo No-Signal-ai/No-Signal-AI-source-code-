@@ -203,6 +203,7 @@ async function deleteCharacter(id) {
     await reload();
   } catch (err) {
     console.error('delete error:', err);
+    alert('Erreur réseau lors de la suppression.');
   }
 }
 
@@ -273,6 +274,7 @@ function initModal() {
 async function boot() {
   try {
     const res = await fetch(`${BACKEND_URL}/api/config`);
+    if (!res.ok) throw new Error('Impossible de charger la configuration.');
     const { supabaseUrl, supabaseAnonKey } = await res.json();
     window.sb = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
@@ -282,6 +284,7 @@ async function boot() {
     initModal();
   } catch (err) {
     console.error('boot error:', err);
+    document.body.innerHTML = '<div style="color:#f08080;padding:40px;font-family:sans-serif">Erreur de chargement. Veuillez rafraîchir la page.</div>';
   }
 }
 
