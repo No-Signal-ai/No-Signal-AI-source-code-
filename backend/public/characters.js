@@ -68,11 +68,15 @@ function buildCard(char) {
     <div class="char-actions">
       <button class="btn-edit">Modifier</button>
       <button class="btn-delete">Supprimer</button>
+      <button class="btn-chat">💬 Parler</button>
     </div>
   `;
 
   card.querySelector('.btn-edit').addEventListener('click',   () => openModal(char));
   card.querySelector('.btn-delete').addEventListener('click', () => deleteCharacter(char.id));
+  card.querySelector('.btn-chat').addEventListener('click',   () => {
+    window.location.href = '/?character_id=' + encodeURIComponent(char.id);
+  });
   return card;
 }
 

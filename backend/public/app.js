@@ -1825,6 +1825,18 @@ async function init() {
   applyBackground(state.profile?.bg_preset, state.profile?.bg_custom_url);
 
   initEvents();
+
+  // Auto-select character when redirected from characters.html
+  const _charId = new URLSearchParams(window.location.search).get('character_id');
+  if (_charId) {
+    const _found = state.characters.find(c => c.id === _charId);
+    if (_found) {
+      state.activeCharacter = _found;
+      renderActiveCharacter();
+      renderCharacterList();
+      window.history.replaceState({}, '', '/');
+    }
+  }
 }
 
 init();
