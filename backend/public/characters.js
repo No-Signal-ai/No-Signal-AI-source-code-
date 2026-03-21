@@ -18,7 +18,7 @@ async function checkAuth() {
 
 // ── HTML escape (always use when injecting user data into innerHTML) ──
 function escHtml(str) {
-  return (str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return (str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── Load characters from API ─────────────────────────────────
@@ -85,7 +85,11 @@ async function loadAvatar(path, avatarEl) {
     });
     if (!res.ok) return;
     const { url } = await res.json();
-    avatarEl.innerHTML = `<img src="${url}" alt="avatar" />`;
+    const img = document.createElement('img');
+    img.setAttribute('src', url);
+    img.setAttribute('alt', 'avatar');
+    avatarEl.innerHTML = '';
+    avatarEl.appendChild(img);
   } catch { /* silent fallback to ◈ */ }
 }
 
@@ -234,7 +238,12 @@ async function uploadAvatar(file) {
 
     const { path, url } = await res.json();
     pendingAvatarPath = path;  // path stored in DB, not the expiring URL
-    document.getElementById('avatar-preview').innerHTML = `<img src="${url}" alt="avatar" />`;
+    const img = document.createElement('img');
+    img.setAttribute('src', url);
+    img.setAttribute('alt', 'avatar');
+    const preview = document.getElementById('avatar-preview');
+    preview.innerHTML = '';
+    preview.appendChild(img);
   } catch (err) {
     uploadErr.textContent  = "Erreur réseau lors de l'upload.";
     uploadErr.style.display = 'block';

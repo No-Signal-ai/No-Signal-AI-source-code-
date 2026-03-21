@@ -435,7 +435,7 @@ app.get('/api/characters', requireAuth, async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('characters')
     .select('*')
-    .eq('user_id', req.user.id)
+    .eq('creator_id', req.user.id)
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data ?? []);
@@ -456,9 +456,15 @@ app.post('/api/characters', requireAuth, async (req, res) => {
   if (avatar_urlT.length > 500)                        return res.status(400).json({ error: 'URL avatar trop longue (max 500).' });
   if (avatar_urlT && !avatar_urlT.startsWith('https://')) return res.status(400).json({ error: 'URL avatar invalide.' });
 
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('username')
+    .eq('id', req.user.id)
+    .single();
+
   const { data, error } = await supabaseAdmin
     .from('characters')
-    .insert({ user_id: req.user.id, name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
+    .insert({ creator_id: req.user.id, creator_username: profile?.username ?? '', name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });
@@ -487,7 +493,7 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
     .from('characters')
     .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
     .eq('id', id)
-    .eq('user_id', req.user.id)
+    .eq('creator_id', req.user.id)
     .select()
     .single();
   if (error && error.code === 'PGRST116') return res.status(404).json({ error: 'Personnage introuvable.' });
@@ -502,7 +508,7 @@ app.delete('/api/characters/:id', requireAuth, async (req, res) => {
     .from('characters')
     .delete()
     .eq('id', id)
-    .eq('user_id', req.user.id)
+    .eq('creator_id', req.user.id)
     .select();
   if (error) return res.status(500).json({ error: error.message });
   if (!data || data.length === 0) return res.status(404).json({ error: 'Personnage introuvable.' });
