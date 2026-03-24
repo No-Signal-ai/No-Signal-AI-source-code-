@@ -442,13 +442,15 @@ app.patch('/api/sessions/:id', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Aucun champ à mettre à jour.' });
   }
 
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('chat_sessions')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', req.user.id);
+    .eq('user_id', req.user.id)
+    .select();
 
   if (error) return res.status(500).json({ error: error.message });
+  if (!data || data.length === 0) return res.status(404).json({ error: 'Session introuvable.' });
   res.json({ ok: true });
 });
 
@@ -456,8 +458,19 @@ app.patch('/api/sessions/:id', requireAuth, async (req, res) => {
 app.delete('/api/sessions/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
 
-  // Delete messages first (chat_messages has no user_id column)
-  await supabaseAdmin.from('chat_messages').delete().eq('session_id', id);
+  // Verify ownership first
+  const { data: session, error: fetchErr } = await supabaseAdmin
+    .from('chat_sessions')
+    .select('id')
+    .eq('id', id)
+    .eq('user_id', req.user.id)
+    .single();
+
+  if (fetchErr || !session) return res.status(404).json({ error: 'Session introuvable.' });
+
+  // Now safe to delete messages (chat_messages has no user_id column)
+  const { error: msgErr } = await supabaseAdmin.from('chat_messages').delete().eq('session_id', id);
+  if (msgErr) console.error('chat_messages delete error:', msgErr.message);
 
   const { error } = await supabaseAdmin
     .from('chat_sessions')
