@@ -337,6 +337,16 @@ async function activateSession(id) {
 
   $('chat-title').textContent = session.name ?? 'Session';
 
+  if (!$('chat-title').dataset.renameAttached) {
+    $('chat-title').dataset.renameAttached = '1';
+    $('chat-title').style.cursor = 'pointer';
+    $('chat-title').title = 'Double-cliquer pour renommer';
+    $('chat-title').addEventListener('dblclick', () => {
+      const s = getCurrentSession();
+      if (s) openRenameModal(s);
+    });
+  }
+
   // Restore character from snapshot
   if (session.character_snapshot) {
     state.activeCharacter = session.character_snapshot;
