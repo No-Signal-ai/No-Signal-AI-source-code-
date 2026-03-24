@@ -1094,6 +1094,47 @@ function renderCommunity() {
   });
 }
 
+// ── Session UI helpers ───────────────────────────────────────
+function relativeTime(isoString) {
+  if (!isoString) return '';
+  const rtf = new Intl.RelativeTimeFormat('fr', { numeric: 'auto' });
+  const diffMs = new Date(isoString) - Date.now();
+  const diffSec = Math.round(diffMs / 1000);
+  const diffMin = Math.round(diffSec / 60);
+  const diffHr  = Math.round(diffMin / 60);
+  const diffDay = Math.round(diffHr / 24);
+  if (Math.abs(diffSec) < 60)  return 'maintenant';
+  if (Math.abs(diffMin) < 60)  return rtf.format(diffMin, 'minute');
+  if (Math.abs(diffHr)  < 24)  return rtf.format(diffHr,  'hour');
+  if (Math.abs(diffDay) < 30)  return rtf.format(diffDay,  'day');
+  return new Date(isoString).toLocaleDateString('fr', { day: 'numeric', month: 'short' });
+}
+
+function sessionAvatar(session) {
+  const snap = session.character_snapshot ?? {};
+  const div = document.createElement('div');
+  div.className = 'session-avatar';
+  if (snap.avatar_emoji) {
+    div.textContent = snap.avatar_emoji;
+  } else if (snap.avatar_url) {
+    const img = document.createElement('img');
+    img.src = snap.avatar_url;
+    img.alt = snap.name ?? '';
+    div.appendChild(img);
+  } else {
+    div.textContent = (snap.name ?? session.name ?? '?')[0].toUpperCase();
+  }
+  return div;
+}
+
+let _sessionMenuOpen = null;
+
+function closeAllSessionMenus() {
+  document.querySelectorAll('.session-dropdown.open').forEach(d => d.classList.remove('open'));
+  _sessionMenuOpen = null;
+}
+document.addEventListener('click', closeAllSessionMenus);
+
 // ── Render sessions with rename/delete ──────────
 function renderSessions() {
   const list = $('session-list');
