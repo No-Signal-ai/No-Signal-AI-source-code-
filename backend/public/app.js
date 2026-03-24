@@ -6,6 +6,9 @@
 // Supabase SQL: ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS attachment_path text;
 // Supabase SQL: ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS attachment_type text;
 // Supabase SQL: ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS attachment_name text;
+// Supabase SQL: ALTER TABLE public.chat_sessions ADD COLUMN IF NOT EXISTS last_message_preview text;
+// Supabase SQL: ALTER TABLE public.chat_sessions ADD COLUMN IF NOT EXISTS last_message_at timestamptz;
+// Supabase SQL: ALTER TABLE public.chat_sessions ADD COLUMN IF NOT EXISTS archived boolean DEFAULT false;
 
 const BACKEND_URL = (window.NO_SIGNAL_BACKEND_URL || '').replace(/\/$/, '');
 let sb = null; // Supabase client
