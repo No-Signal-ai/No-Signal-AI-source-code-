@@ -2,7 +2,7 @@ node_modules/
 .env
 .worktrees/
 
-# local developer tooling (not for distribution)
+# contexte pours les IA utilisé dans l'appli; claude/Gemini/chatGPT/LLm open source auto-hébérger 
 CLAUDE.md
 AGENTS.md
 GEMINI.md
