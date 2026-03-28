@@ -1,4 +1,5 @@
 import express      from 'express';
+import fs           from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
@@ -17,29 +18,51 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGIN ?? '')
   .map(o => o.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
-// ── Model registry ──────────────────────────────────────────
-const MODEL_REGISTRY = {
-  'aurora-70':  { provider: 'groq',   id: 'llama-3.3-70b-versatile',        baseUrl: 'https://api.groq.com/openai/v1',                          vision: false },
-  'prism':      { provider: 'groq',   id: 'mixtral-8x7b-32768',              baseUrl: 'https://api.groq.com/openai/v1',                          vision: false },
-  'swift':      { provider: 'groq',   id: 'llama3-8b-8192',                  baseUrl: 'https://api.groq.com/openai/v1',                          vision: false },
-  'lumina':     { provider: 'groq',   id: 'llama-3.1-8b-instant',            baseUrl: 'https://api.groq.com/openai/v1',                          vision: false },
-  'vision-90':  { provider: 'groq',   id: 'llama-3.2-90b-vision-preview',    baseUrl: 'https://api.groq.com/openai/v1',                          vision: true  },
-  'stellar':    { provider: 'gemini', id: 'gemini-1.5-flash',                baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', vision: true  },
-};
-const DEFAULT_MODEL = 'aurora-70';
+// ── AI config (private) ─────────────────────────────────────
+const AI_CONFIG_PATH = process.env.AI_CONFIG_PATH
+  ? resolve(process.env.AI_CONFIG_PATH)
+  : resolve(__dirname, '..', '.private', 'ai-config.json');
+
+function loadAiConfig() {
+  let raw = '';
+  if (process.env.AI_CONFIG_JSON) raw = process.env.AI_CONFIG_JSON;
+  else if (fs.existsSync(AI_CONFIG_PATH)) raw = fs.readFileSync(AI_CONFIG_PATH, 'utf8');
+  if (!raw) return null;
+  try { return JSON.parse(raw); }
+  catch (err) {
+    console.error('AI config error:', err?.message ?? err);
+    return null;
+  }
+}
+
+const AI_CONFIG = loadAiConfig();
+const MODEL_REGISTRY = AI_CONFIG?.models ?? {};
+const DEFAULT_MODEL = AI_CONFIG?.defaultModel ?? Object.keys(MODEL_REGISTRY)[0] ?? null;
 
 function getModel(key) {
-  const def    = MODEL_REGISTRY[key] ?? MODEL_REGISTRY[DEFAULT_MODEL];
-  const apiKey = def.provider === 'groq' ? process.env.GROQ_API_KEY : process.env.GEMINI_API_KEY;
+  if (!DEFAULT_MODEL) return null;
+  const def = MODEL_REGISTRY[key] ?? MODEL_REGISTRY[DEFAULT_MODEL];
+  if (!def) return null;
+  const apiKey = def.apiKeyEnv ? process.env[def.apiKeyEnv] : null;
+  return { ...def, apiKey };
+}
+
+function getEmbeddingsConfig() {
+  const def = AI_CONFIG?.embeddings;
+  if (!def) return null;
+  const apiKey = def.apiKeyEnv ? process.env[def.apiKeyEnv] : null;
+  return { ...def, apiKey };
+}
+
+function getSummaryConfig() {
+  const def = AI_CONFIG?.summarization;
+  if (!def) return null;
+  const apiKey = def.apiKeyEnv ? process.env[def.apiKeyEnv] : null;
   return { ...def, apiKey };
 }
 
 // ── Dev config ──────────────────────────────────────────────
-const DEV_BADGE_CONFIG = {
-  'yugoslevent@gmail.com': ['OWNER', 'DEV', 'ADMIN', 'CODEUR'],
-  'yugo2028@gmail.com':    ['DEV'],
-  'yugo063@gmail.com':     ['DEV'],
-};
+const DEV_BADGE_CONFIG = JSON.parse(process.env.DEV_BADGE_CONFIG ?? '{}');
 function getDevEmails() {
   return (process.env.DEV_EMAILS ?? '').split(',').map(e => e.trim()).filter(Boolean);
 }
@@ -142,17 +165,18 @@ function buildSystemPrompt(character, summary, userPersona, ragContext) {
   return prompt;
 }
 
-// ── HuggingFace embeddings (RAG) ────────────────────────────
+// ── Embeddings (RAG) ────────────────────────────────────────
 async function embedText(text) {
-  const hfKey = process.env.HF_API_KEY;
-  if (!hfKey) return null;
+  const cfg = getEmbeddingsConfig();
+  if (!cfg?.apiKey || !cfg?.baseUrl) return null;
+  const maxChars = Number(cfg.inputMaxChars) || 512;
   try {
     const res = await fetch(
-      'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
+      cfg.baseUrl,
       {
         method:  'POST',
-        headers: { 'Authorization': `Bearer ${hfKey}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ inputs: text.slice(0, 512) }),
+        headers: { 'Authorization': `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ inputs: text.slice(0, maxChars) }),
       }
     );
     if (!res.ok) return null;
@@ -185,12 +209,13 @@ async function storeMemory(userId, sessionId, userMsg, assistantMsg, charName) {
 
 // ── GET /api/config ─────────────────────────────────────────
 app.get('/api/config', (_req, res) => {
+  const embeddingsCfg = getEmbeddingsConfig();
   res.json({
     supabaseUrl:     process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
     devEmails:       getDevEmails(),
     devBadgeConfig:  DEV_BADGE_CONFIG,
-    ragEnabled:      !!process.env.HF_API_KEY,
+    ragEnabled:      !!embeddingsCfg?.apiKey,
     models:          Object.fromEntries(
       Object.entries(MODEL_REGISTRY).map(([k, v]) => [k, { vision: v.vision }])
     ),
@@ -209,16 +234,20 @@ app.post('/chat', requireAuth, chatLimiter, async (req, res) => {
   }
 
   const model = getModel(modelKey);
+  if (!model) {
+    return res.status(503).json({ error: 'Configuration AI manquante.' });
+  }
   if (!model.apiKey) {
-    return res.status(500).json({ error: `Clé API manquante pour "${model.provider}".` });
+    return res.status(500).json({ error: 'Clé API manquante pour ce modèle.' });
   }
   if (attachedImageUrl && !model.vision) {
     return res.status(400).json({ error: 'Ce modèle ne supporte pas les images. Utilisez STELLAR ou VISION-90.' });
   }
 
   // RAG search
+  const embeddingsCfg = getEmbeddingsConfig();
   let ragContext = '';
-  if (process.env.HF_API_KEY && sessionId) {
+  if (embeddingsCfg?.apiKey && sessionId) {
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
     const emb = await embedText(lastUserMsg);
     const mems = await searchMemories(req.user.id, emb);
@@ -228,16 +257,25 @@ app.post('/chat', requireAuth, chatLimiter, async (req, res) => {
   // Summarize old messages
   let currentSummary = existingSummary ?? null;
   let newSummary     = null;
-  if (messages.length > 20 && process.env.GROQ_API_KEY) {
+  const summaryCfg   = getSummaryConfig();
+  const minMessages  = Number(summaryCfg?.minMessages) || 20;
+  const keepLast     = Number(summaryCfg?.keepLast) || 10;
+  if (
+    messages.length > minMessages
+    && summaryCfg?.apiKey
+    && summaryCfg?.baseUrl
+    && summaryCfg?.modelId
+  ) {
     try {
-      const oldText    = messages.slice(0, -10).map(m => `${m.role}: ${m.content}`).join('\n');
-      const summaryRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const oldText    = messages.slice(0, -keepLast).map(m => `${m.role}: ${m.content}`).join('\n');
+      const summaryRes = await fetch(`${summaryCfg.baseUrl}/chat/completions`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${summaryCfg.apiKey}` },
         body: JSON.stringify({
-          model: 'llama3-8b-8192',
+          model: summaryCfg.modelId,
           messages: [{ role: 'user', content: `Summarize this roleplay conversation in 3-5 sentences:\n\n${oldText}` }],
-          temperature: 0.5, max_tokens: 200,
+          temperature: Number(summaryCfg.temperature) || 0.5,
+          max_tokens:  Number(summaryCfg.maxTokens) || 200,
         }),
       });
       if (summaryRes.ok) {
@@ -337,7 +375,7 @@ app.post('/chat', requireAuth, chatLimiter, async (req, res) => {
   }
 
   // Store memory (fire & forget)
-  if (process.env.HF_API_KEY && sessionId && fullContent) {
+  if (embeddingsCfg?.apiKey && sessionId && fullContent) {
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
     storeMemory(req.user.id, sessionId, lastUserMsg, fullContent, character?.name);
   }
@@ -403,7 +441,8 @@ app.get('/api/dev/stats', requireAuth, async (req, res) => {
     supabaseAdmin.from('memory_vectors').select('*', { count: 'exact', head: true }),
   ]);
 
-  res.json({ userCount, charCount, sessionCount, memoryCount, ragEnabled: !!process.env.HF_API_KEY });
+  const embeddingsCfg = getEmbeddingsConfig();
+  res.json({ userCount, charCount, sessionCount, memoryCount, ragEnabled: !!embeddingsCfg?.apiKey });
 });
 
 // ── GET /api/announcements ──────────────────────────────────

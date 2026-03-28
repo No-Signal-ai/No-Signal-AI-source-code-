@@ -1,142 +1,155 @@
-# No-Signa-AI-source-code-
-the official repo of the no-signa.ai site, it is private and protected by License, source code do NOT leak any information !
-# 🧠 NO-SIGNAL — AI Roleplay Platform
+# NO-SIGNAL — AI Roleplay Platform
 
-> A lightweight, customizable AI roleplay platform focused on character consistency, memory systems, and developer control.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
----
+> A lightweight, open-source AI roleplay platform with character persistence, hybrid memory, and a pluggable AI backend.
 
-## 🚀 Overview
-
-**NO-SIGNAL** is an experimental AI-powered roleplay platform designed to replicate and improve the core experience of modern AI chat systems.
-
-Unlike traditional platforms, NO-SIGNAL focuses on:
-
-* 🧩 Structured character design
-* 🧠 Memory persistence (short & long-term)
-* 🔓 Flexibility (local or external AI models)
-* ⚙️ Full developer control over prompts and behavior
+**Live demo:** https://no-signal-ai-source-code-production.up.railway.app
 
 ---
 
-## ✨ Features
+## Features
 
-* 💬 Real-time AI chat interface
-* 👤 Custom character creation system
-* 🧠 Memory engine (context + summarization)
-* 🔌 Pluggable AI backend (OpenAI / Claude / local models)
-* 🌙 Minimalist dark UI (Discord-inspired)
-
----
-
-## 🏗️ Architecture
-
-```
-Frontend (GitHub Pages)
-│
-├── UI (HTML / CSS / JS)
-│
-Backend (API Layer)
-│
-├── /chat        → AI interaction
-├── /memory      → context storage
-├── /character   → character management
-│
-AI Engine
-│
-├── External APIs (Claude / GPT / Gemini)
-└── Local Models (Ollama / vLLM)
-```
+- **Real-time chat** — SSE streaming from Groq / Google Gemini
+- **Character system** — Create, customize, and share AI personas with avatars
+- **Hybrid memory** — Short-term context + long-term summarization + RAG (pgvector embeddings)
+- **Session management** — Rename, archive, and delete conversations
+- **File uploads** — Send images and files in chat (stored in Supabase Storage)
+- **Auth** — Email/password login via Supabase Auth
+- **Dark UI** — Discord-inspired minimal interface, no framework
+- **Rate limiting** — Built-in per-route rate limiting
 
 ---
 
-## 🧠 Memory System
+## Tech Stack
 
-NO-SIGNAL uses a hybrid memory system:
-
-### 🔹 Short-term memory
-
-Recent conversation messages (last N interactions)
-
-### 🔹 Long-term memory
-
-Summarized context stored and injected into prompts
-
-### 🔹 Character core
-
-Structured personality definition:
-
-```
-Name: Aiko  
-Personality: Cold, sarcastic  
-Tone: Short, ironic responses  
-Lore: Cyberpunk hacker  
-```
+| Layer | Technology |
+|-------|-----------|
+| Frontend | HTML / CSS / Vanilla JS (no framework, no bundler) |
+| Backend | Node.js + Express (ES modules) |
+| Database | Supabase (PostgreSQL + pgvector) |
+| Auth | Supabase Auth |
+| File storage | Supabase Storage |
+| AI providers | Groq, Google Gemini (configurable) |
+| Embeddings | HuggingFace Inference API (optional, for RAG) |
+| Payments | Stripe (optional) |
+| Deploy | Railway |
 
 ---
 
-## ⚙️ Tech Stack
+## Getting Started
 
-* Frontend: HTML, CSS, JavaScript
-* Backend: Node.js / Cloudflare Workers
-* AI: Claude API / OpenAI / Ollama
-* Storage: JSON (MVP) → Database (future)
-
----
-
-## 🔐 Security
-
-* API keys stored server-side only
-* No sensitive data exposed to client
-* Request validation & rate limiting planned
-
----
-
-## 📦 Installation (MVP)
+### 1. Clone & install
 
 ```bash
-git clone https://github.com/Yugos06/NO-SIGNAL-
-cd NO-SIGNAL-
+git clone https://github.com/Yugos06/No-Signa-AI-source-code-
+cd No-Signa-AI-source-code-/backend
+npm install
 ```
 
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+```
+
+### 3. Set up Supabase
+
+Create a project at [supabase.com](https://supabase.com) and run the following tables:
+
+```sql
+-- Required tables (run in Supabase SQL editor)
+create table profiles (id uuid references auth.users primary key, display_name text, persona text);
+create table characters (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users, name text, personality text, tone text, lore text, avatar_url text, is_public boolean default false, tags text[]);
+create table chat_sessions (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users, character_id uuid references characters, character_snapshot jsonb, summary text, last_message_at timestamptz);
+create table chat_messages (id uuid default gen_random_uuid() primary key, session_id uuid references chat_sessions, role text, content text, file_url text, file_type text, created_at timestamptz default now());
+create table announcements (id uuid default gen_random_uuid() primary key, content text, created_at timestamptz default now());
+-- Optional: for RAG memory search
+create extension if not exists vector;
+create table memory_vectors (id uuid default gen_random_uuid() primary key, session_id uuid references chat_sessions, content text, embedding vector(384), created_at timestamptz default now());
+create or replace function search_memories(query_embedding vector(384), match_session_id uuid, match_count int)
+returns table(content text, similarity float) language sql as $$
+  select content, 1 - (embedding <=> query_embedding) as similarity
+  from memory_vectors
+  where session_id = match_session_id
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+```
+
+### 4. Configure AI models
+
+Copy the example config and fill in your model details:
+
+```bash
+cp .private/ai-config.json.example .private/ai-config.json  # if provided
+# Or set AI_CONFIG_JSON env var with your model configuration
+```
+
+### 5. Run
+
+```bash
+npm run dev   # development (auto-reload)
+npm start     # production
+```
+
+Open http://localhost:3000
+
 ---
 
-## 🧪 Development Roadmap
+## Environment Variables
 
-* [x] Basic chat UI
-* [x] AI integration
-* [ ] Character system
-* [ ] Memory engine
-* [ ] Auth system
-* [ ] Multi-user support
-* [ ] Local model integration
+See [`backend/.env.example`](backend/.env.example) for the full list. Key variables:
 
----
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (server-side only) |
+| `AI_CONFIG_PATH` | Yes* | Path to AI model config JSON |
+| `AI_CONFIG_JSON` | Yes* | Inline AI model config (alternative to file) |
+| `HF_API_KEY` | No | HuggingFace API key — enables RAG memory search |
+| `STRIPE_SECRET_KEY` | No | Stripe secret key — enables subscription page |
+| `DEV_EMAILS` | No | Comma-separated dev account emails |
+| `DEV_BADGE_CONFIG` | No | JSON map of email → badge roles |
+| `ALLOWED_ORIGIN` | No | Restrict CORS to specific origin |
 
-## ⚠️ Disclaimer
-
-This project is experimental and under active development.
-Expect bugs, inconsistencies, and rapid changes.
-
----
-
-## 🤝 Contributing
-
-Contributions, ideas, and feedback are welcome.
+*One of `AI_CONFIG_PATH` or `AI_CONFIG_JSON` is required.
 
 ---
 
-## 🧑‍💻 Author
+## Architecture
 
-Developed by **Yugos06**
-Junior developer exploring AI, Linux, and game development.
+```
+Browser (HTML/CSS/JS)
+        │
+        ▼
+backend/server.js  (Express, Node.js ES modules)
+        │
+        ├── /chat           → AI streaming (SSE)
+        ├── /api/characters → Character CRUD
+        ├── /api/sessions   → Session management
+        ├── /api/upload     → File uploads (multer → Supabase Storage)
+        └── /api/*          → Auth, profiles, announcements
+        │
+        ├── Groq / Google Gemini  (AI inference)
+        ├── HuggingFace           (embeddings, optional)
+        └── Supabase              (DB, auth, storage)
+```
+
+**Chat flow:** JWT validated → character snapshot loaded → RAG memory searched → old messages summarized if >20 → system prompt built → AI called with SSE streaming → response streamed to browser → messages + embeddings stored asynchronously.
 
 ---
 
-## 🪐 Vision
+## Contributing
 
-Build a fully customizable, open AI roleplay system that gives control back to developers and users.
+Contributions are welcome. Open an issue or submit a pull request.
+
+Keep it simple: no TypeScript, no bundler, no framework.
 
 ---
 
-> “Control the character. Control the story.”
+## License
+
+[MIT](LICENSE) — © 2026 Yugos06
