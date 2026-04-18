@@ -73,18 +73,18 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | DB-01 | Phase 1 | Pending |
+| DB-02 | Phase 1 | Pending |
 | CHAR-01 | Phase 1 | Pending |
 | CHAR-02 | Phase 1 | Pending |
 | SYSP-01 | Phase 1 | Pending |
 | SYSP-02 | Phase 1 | Pending |
 | SYSP-03 | Phase 1 | Pending |
-| DB-02 | Phase 1 | Pending |
+| CHAR-03 | Phase 2 | Pending |
+| CHAR-04 | Phase 2 | Pending |
 | DISC-01 | Phase 2 | Pending |
 | DISC-02 | Phase 2 | Pending |
 | DISC-03 | Phase 2 | Pending |
 | DISC-04 | Phase 2 | Pending |
-| CHAR-03 | Phase 2 | Pending |
-| CHAR-04 | Phase 2 | Pending |
 | GUEST-01 | Phase 2 | Pending |
 | GUEST-02 | Phase 2 | Pending |
 | GUEST-03 | Phase 2 | Pending |
@@ -92,10 +92,10 @@
 | DEP-01 | Phase 3 | Pending |
 
 **Coverage:**
-- v1 requirements: 17 total
-- Mapped to phases: 17
+- v1 requirements: 18 total
+- Mapped to phases: 18
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-18*
-*Last updated: 2026-04-18 after initial definition*
+*Last updated: 2026-04-18 — traceability confirmed after roadmap creation (count corrected 17→18)*
