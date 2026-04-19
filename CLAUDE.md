@@ -129,3 +129,66 @@ DEV_BADGE_CONFIG       # JSON badges par email
 3. **Ne jamais écrire dans la DB sans vérifier l'ownership**
 4. **Tester localement avant de proposer un déploiement**
 5. **Un seul fichier modifié à la fois sur les gros fichiers (server.js, app.js)**
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**No-Signal AI — v2 Alpha Community**
+
+No-Signal AI est une plateforme de roleplay IA communautaire où les utilisateurs interagissent avec des personnages fictifs créés par la communauté. La v2 ouvre la plateforme au public : découverte de personnages sans compte, chat invité via localStorage, et outils créateurs améliorés. Cible : n'importe qui voulant du roleplay IA sans barrière d'entrée.
+
+**Core Value:** Un visiteur non connecté doit pouvoir découvrir des personnages publics et démarrer un chat immédiatement, sans inscription.
+
+### Constraints
+
+- **Stack** : Node.js ESM + Express + HTML/CSS/JS vanilla — pas de framework, pas de TypeScript
+- **Taille fichiers** : `server.js` et `app.js` sont gros — modifier un seul à la fois
+- **Auth** : Ne jamais bypass `requireAuth` sur une route qui mute des données
+- **Sécurité** : Les clés API ne transitent jamais vers le frontend
+- **Déploiement** : Railway auto-deploy depuis GitHub `main` — tester localement avant push
+- **Timeline** : Plan 5 jours pour Alpha
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:STACK.md -->
+## Technology Stack
+
+Technology stack not yet documented. Will populate after codebase mapping or first phase.
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+Conventions not yet established. Will populate as patterns emerge during development.
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+Architecture not yet mapped. Follow existing patterns found in the codebase.
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+## Project Skills
+
+No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, or `.github/skills/` with a `SKILL.md` index file.
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->
