@@ -35,7 +35,33 @@ function loadAiConfig() {
   }
 }
 
-const AI_CONFIG = loadAiConfig();
+function buildFallbackConfig() {
+  const groqModel = process.env.GROQ_MODEL;
+  const groqKey   = process.env.GROQ_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!groqModel || !groqKey) return null;
+  const groqBase   = 'https://api.groq.com/openai/v1';
+  const geminiBase = 'https://generativelanguage.googleapis.com/v1beta/openai';
+  return {
+    defaultModel: 'aurora-70',
+    models: {
+      'aurora-70':  { id: groqModel,                      baseUrl: groqBase,   apiKeyEnv: 'GROQ_API_KEY',   vision: false },
+      'swift':      { id: 'llama-3.1-8b-instant',         baseUrl: groqBase,   apiKeyEnv: 'GROQ_API_KEY',   vision: false },
+      'prism':      { id: 'mixtral-8x7b-32768',           baseUrl: groqBase,   apiKeyEnv: 'GROQ_API_KEY',   vision: false },
+      'vision-90':  { id: 'llama-3.2-90b-vision-preview', baseUrl: groqBase,   apiKeyEnv: 'GROQ_API_KEY',   vision: true  },
+      ...(geminiKey ? {
+        'stellar':  { id: 'gemini-2.0-flash',  baseUrl: geminiBase, apiKeyEnv: 'GEMINI_API_KEY', vision: true  },
+        'lumina':   { id: 'gemini-1.5-flash',  baseUrl: geminiBase, apiKeyEnv: 'GEMINI_API_KEY', vision: false },
+      } : {}),
+    },
+    summarization: {
+      modelId: 'llama-3.1-8b-instant', baseUrl: groqBase, apiKeyEnv: 'GROQ_API_KEY',
+      temperature: 0.5, maxTokens: 200, minMessages: 20, keepLast: 10,
+    },
+  };
+}
+
+const AI_CONFIG = loadAiConfig() ?? buildFallbackConfig();
 const MODEL_REGISTRY = AI_CONFIG?.models ?? {};
 const DEFAULT_MODEL = AI_CONFIG?.defaultModel ?? Object.keys(MODEL_REGISTRY)[0] ?? null;
 
