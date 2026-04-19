@@ -115,6 +115,9 @@ function resetModal() {
   document.getElementById('field-personality').value = '';
   document.getElementById('field-tone').value        = '';
   document.getElementById('field-lore').value        = '';
+  document.getElementById('field-style').value    = '';
+  document.getElementById('field-category').value = 'autre';
+  document.getElementById('field-public').checked = false;
   document.getElementById('avatar-preview').innerHTML = '◈';
   document.getElementById('upload-error').style.display = 'none';
   showModalError('');
@@ -131,6 +134,9 @@ function openModal(char = null) {
     document.getElementById('field-personality').value        = char.personality ?? '';
     document.getElementById('field-tone').value               = char.tone ?? '';
     document.getElementById('field-lore').value               = char.lore ?? '';
+    document.getElementById('field-style').value    = char.style ?? '';
+    document.getElementById('field-category').value = char.category ?? 'autre';
+    document.getElementById('field-public').checked = !!char.is_public;
     if (char.avatar_url) {
       pendingAvatarPath = char.avatar_url;
       // Refresh signed URL for preview — avatar_url in DB is a path, not a URL
@@ -155,6 +161,9 @@ async function saveCharacter(e) {
   const personality = document.getElementById('field-personality').value;
   const tone        = document.getElementById('field-tone').value;
   const lore        = document.getElementById('field-lore').value;
+  const style     = document.getElementById('field-style').value;
+  const category  = document.getElementById('field-category').value;
+  const is_public = document.getElementById('field-public').checked;
 
   if (!name) { showModalError('Le nom est requis.'); return; }
 
@@ -165,7 +174,7 @@ async function saveCharacter(e) {
 
   try {
     const token  = await getToken();
-    const body   = { name, personality, tone, lore, avatar_url: pendingAvatarPath ?? '' };
+    const body   = { name, personality, tone, lore, avatar_url: pendingAvatarPath ?? '', style, category, is_public };
     const url    = editingId
       ? `${BACKEND_URL}/api/characters/${editingId}`
       : `${BACKEND_URL}/api/characters`;
