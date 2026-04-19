@@ -145,23 +145,40 @@ async function requireAuth(req, res, next) {
 // ── System prompt builder ───────────────────────────────────
 function buildSystemPrompt(character, summary, userPersona, ragContext) {
   const char = character ?? {};
-  let prompt = `You are a roleplay character. Stay in character at all times. Never break character or mention you are an AI.`;
 
-  if (char.name)        prompt += `\n\nName: ${char.name}`;
-  if (char.personality) prompt += `\nPersonality: ${char.personality}`;
-  if (char.tone)        prompt += `\nTone: ${char.tone}`;
-  if (char.lore)        prompt += `\nBackground / Lore: ${char.lore}`;
+  // Identité — toujours présente (D-01, D-02)
+  let prompt = char.name
+    ? `You ARE ${char.name}. This is not roleplay — you are ${char.name}, speaking with your own voice.`
+    : `You are a character. Speak with your own voice.`;
 
-  if (summary)    prompt += `\n\n--- Memory summary (earlier in this conversation) ---\n${summary}`;
+  // Personality — omise si vide (D-03)
+  if (char.personality?.trim()) prompt += `\n\n${char.personality.trim()}`;
+
+  // Tone — omise si vide (D-03)
+  if (char.tone?.trim()) prompt += `\n\nTone: ${char.tone.trim()}`;
+
+  // Writing style — section dédiée, nouveau champ (D-06, D-03)
+  if (char.style?.trim()) prompt += `\n\nWriting style: ${char.style.trim()}`;
+
+  // Background/Lore — omise si vide (D-03)
+  if (char.lore?.trim()) prompt += `\n\nBackground: ${char.lore.trim()}`;
+
+  // Memory summary
+  if (summary) prompt += `\n\n--- Memory summary (earlier in this conversation) ---\n${summary}`;
+
+  // RAG context
   if (ragContext) prompt += `\n\n--- Relevant past memories ---\n${ragContext}`;
 
+  // User persona
   if (userPersona?.name || userPersona?.desc) {
     prompt += `\n\n--- The person you're talking to ---`;
     if (userPersona.name) prompt += `\nName: ${userPersona.name}`;
     if (userPersona.desc) prompt += `\nDescription: ${userPersona.desc}`;
   }
 
-  prompt += `\n\nRespond naturally, staying true to your character. Keep responses concise unless the scene demands otherwise.`;
+  // Ligne de clôture naturelle (D-04 — toujours présente)
+  prompt += `\n\nSpeak naturally, as yourself. Never break this identity.`;
+
   return prompt;
 }
 
