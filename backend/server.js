@@ -590,7 +590,8 @@ app.get('/api/characters', requireAuth, async (req, res) => {
 
 // ── POST /api/characters ────────────────────────────────────
 app.post('/api/characters', requireAuth, async (req, res) => {
-  const { name, personality = '', tone = '', lore = '', avatar_url = '' } = req.body;
+  const { name, personality = '', tone = '', lore = '', avatar_url = '',
+          style = '', is_public = false, category = 'autre' } = req.body;
   if (!name?.trim())               return res.status(400).json({ error: 'Le nom est requis.' });
   if (name.trim().length > 100)    return res.status(400).json({ error: 'Nom trop long (max 100).' });
   const personalityT = String(personality ?? '').trim();
@@ -602,6 +603,13 @@ app.post('/api/characters', requireAuth, async (req, res) => {
   const avatar_urlT = String(avatar_url ?? '').trim();
   if (avatar_urlT.length > 500)                        return res.status(400).json({ error: 'URL avatar trop longue (max 500).' });
   if (avatar_urlT && !avatar_urlT.startsWith('https://')) return res.status(400).json({ error: 'URL avatar invalide.' });
+  const VALID_CATEGORIES = ['anime', 'fantasy', 'sci-fi', 'historique', 'original', 'autre'];
+  const styleT     = String(style ?? '').trim();
+  const is_publicB = is_public === true || is_public === 'true';
+  const categoryT  = VALID_CATEGORIES.includes(String(category ?? '').trim())
+                       ? String(category).trim()
+                       : 'autre';
+  if (styleT.length > 1000) return res.status(400).json({ error: 'Style trop long (max 1000).' });
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
@@ -611,7 +619,7 @@ app.post('/api/characters', requireAuth, async (req, res) => {
 
   const { data, error } = await getUserClient(req)
     .from('characters')
-    .insert({ creator_id: req.user.id, creator_username: profile?.username ?? '', name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
+    .insert({ creator_id: req.user.id, creator_username: profile?.username ?? '', name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT, style: styleT, is_public: is_publicB, category: categoryT })
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });
@@ -621,7 +629,8 @@ app.post('/api/characters', requireAuth, async (req, res) => {
 // ── PUT /api/characters/:id ─────────────────────────────────
 app.put('/api/characters/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { name, personality = '', tone = '', lore = '', avatar_url = '' } = req.body;
+  const { name, personality = '', tone = '', lore = '', avatar_url = '',
+          style = '', is_public = false, category = 'autre' } = req.body;
   if (!name?.trim())               return res.status(400).json({ error: 'Le nom est requis.' });
   if (name.trim().length > 100)    return res.status(400).json({ error: 'Nom trop long (max 100).' });
 
@@ -635,10 +644,17 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
   const avatar_urlT = String(avatar_url ?? '').trim();
   if (avatar_urlT.length > 500)                           return res.status(400).json({ error: 'URL avatar trop longue (max 500).' });
   if (avatar_urlT && !avatar_urlT.startsWith('https://')) return res.status(400).json({ error: 'URL avatar invalide.' });
+  const VALID_CATEGORIES = ['anime', 'fantasy', 'sci-fi', 'historique', 'original', 'autre'];
+  const styleT     = String(style ?? '').trim();
+  const is_publicB = is_public === true || is_public === 'true';
+  const categoryT  = VALID_CATEGORIES.includes(String(category ?? '').trim())
+                       ? String(category).trim()
+                       : 'autre';
+  if (styleT.length > 1000) return res.status(400).json({ error: 'Style trop long (max 1000).' });
 
   const { data, error } = await getUserClient(req)
     .from('characters')
-    .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
+    .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT, style: styleT, is_public: is_publicB, category: categoryT })
     .eq('id', id)
     .eq('creator_id', req.user.id)
     .select()
