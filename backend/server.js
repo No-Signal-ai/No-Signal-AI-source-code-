@@ -145,40 +145,23 @@ async function requireAuth(req, res, next) {
 // ── System prompt builder ───────────────────────────────────
 function buildSystemPrompt(character, summary, userPersona, ragContext) {
   const char = character ?? {};
+  let prompt = `You are a roleplay character. Stay in character at all times. Never break character or mention you are an AI.`;
 
-  // Identité — toujours présente (D-01, D-02)
-  let prompt = char.name
-    ? `You ARE ${char.name}. This is not roleplay — you are ${char.name}, speaking with your own voice.`
-    : `You are a character. Speak with your own voice.`;
+  if (char.name)        prompt += `\n\nName: ${char.name}`;
+  if (char.personality) prompt += `\nPersonality: ${char.personality}`;
+  if (char.tone)        prompt += `\nTone: ${char.tone}`;
+  if (char.lore)        prompt += `\nBackground / Lore: ${char.lore}`;
 
-  // Personality — omise si vide (D-03)
-  if (char.personality?.trim()) prompt += `\n\n${char.personality.trim()}`;
-
-  // Tone — omise si vide (D-03)
-  if (char.tone?.trim()) prompt += `\n\nTone: ${char.tone.trim()}`;
-
-  // Writing style — section dédiée, nouveau champ (D-06, D-03)
-  if (char.style?.trim()) prompt += `\n\nWriting style: ${char.style.trim()}`;
-
-  // Background/Lore — omise si vide (D-03)
-  if (char.lore?.trim()) prompt += `\n\nBackground: ${char.lore.trim()}`;
-
-  // Memory summary
-  if (summary) prompt += `\n\n--- Memory summary (earlier in this conversation) ---\n${summary}`;
-
-  // RAG context
+  if (summary)    prompt += `\n\n--- Memory summary (earlier in this conversation) ---\n${summary}`;
   if (ragContext) prompt += `\n\n--- Relevant past memories ---\n${ragContext}`;
 
-  // User persona
   if (userPersona?.name || userPersona?.desc) {
     prompt += `\n\n--- The person you're talking to ---`;
     if (userPersona.name) prompt += `\nName: ${userPersona.name}`;
     if (userPersona.desc) prompt += `\nDescription: ${userPersona.desc}`;
   }
 
-  // Ligne de clôture naturelle (D-04 — toujours présente)
-  prompt += `\n\nSpeak naturally, as yourself. Never break this identity.`;
-
+  prompt += `\n\nRespond naturally, staying true to your character. Keep responses concise unless the scene demands otherwise.`;
   return prompt;
 }
 
@@ -588,31 +571,9 @@ app.get('/api/characters', requireAuth, async (req, res) => {
   res.json(data ?? []);
 });
 
-// ── GET /api/characters/public ──────────────────────────────
-app.get('/api/characters/public', async (req, res) => {
-  const { category } = req.query;
-  const VALID_CATEGORIES = ['anime', 'fantasy', 'sci-fi', 'historique', 'original', 'autre'];
-
-  let query = supabaseAdmin
-    .from('characters')
-    .select('id, name, personality, category, avatar_url, creator_username, created_at, chat_count')
-    .eq('is_public', true)
-    .order('created_at', { ascending: false })
-    .limit(100);
-
-  if (category && VALID_CATEGORIES.includes(category)) {
-    query = query.eq('category', category);
-  }
-
-  const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data ?? []);
-});
-
 // ── POST /api/characters ────────────────────────────────────
 app.post('/api/characters', requireAuth, async (req, res) => {
-  const { name, personality = '', tone = '', lore = '', avatar_url = '',
-          style = '', is_public = false, category = 'autre' } = req.body;
+  const { name, personality = '', tone = '', lore = '', avatar_url = '' } = req.body;
   if (!name?.trim())               return res.status(400).json({ error: 'Le nom est requis.' });
   if (name.trim().length > 100)    return res.status(400).json({ error: 'Nom trop long (max 100).' });
   const personalityT = String(personality ?? '').trim();
@@ -624,13 +585,6 @@ app.post('/api/characters', requireAuth, async (req, res) => {
   const avatar_urlT = String(avatar_url ?? '').trim();
   if (avatar_urlT.length > 500)                        return res.status(400).json({ error: 'URL avatar trop longue (max 500).' });
   if (avatar_urlT && !avatar_urlT.startsWith('https://')) return res.status(400).json({ error: 'URL avatar invalide.' });
-  const VALID_CATEGORIES = ['anime', 'fantasy', 'sci-fi', 'historique', 'original', 'autre'];
-  const styleT     = String(style ?? '').trim();
-  const is_publicB = is_public === true || is_public === 'true';
-  const categoryT  = VALID_CATEGORIES.includes(String(category ?? '').trim())
-                       ? String(category).trim()
-                       : 'autre';
-  if (styleT.length > 1000) return res.status(400).json({ error: 'Style trop long (max 1000).' });
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
@@ -640,7 +594,7 @@ app.post('/api/characters', requireAuth, async (req, res) => {
 
   const { data, error } = await getUserClient(req)
     .from('characters')
-    .insert({ creator_id: req.user.id, creator_username: profile?.username ?? '', name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT, style: styleT, is_public: is_publicB, category: categoryT })
+    .insert({ creator_id: req.user.id, creator_username: profile?.username ?? '', name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
     .select()
     .single();
   if (error) return res.status(500).json({ error: error.message });
@@ -650,8 +604,7 @@ app.post('/api/characters', requireAuth, async (req, res) => {
 // ── PUT /api/characters/:id ─────────────────────────────────
 app.put('/api/characters/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { name, personality = '', tone = '', lore = '', avatar_url = '',
-          style = '', is_public = false, category = 'autre' } = req.body;
+  const { name, personality = '', tone = '', lore = '', avatar_url = '' } = req.body;
   if (!name?.trim())               return res.status(400).json({ error: 'Le nom est requis.' });
   if (name.trim().length > 100)    return res.status(400).json({ error: 'Nom trop long (max 100).' });
 
@@ -665,17 +618,10 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
   const avatar_urlT = String(avatar_url ?? '').trim();
   if (avatar_urlT.length > 500)                           return res.status(400).json({ error: 'URL avatar trop longue (max 500).' });
   if (avatar_urlT && !avatar_urlT.startsWith('https://')) return res.status(400).json({ error: 'URL avatar invalide.' });
-  const VALID_CATEGORIES = ['anime', 'fantasy', 'sci-fi', 'historique', 'original', 'autre'];
-  const styleT     = String(style ?? '').trim();
-  const is_publicB = is_public === true || is_public === 'true';
-  const categoryT  = VALID_CATEGORIES.includes(String(category ?? '').trim())
-                       ? String(category).trim()
-                       : 'autre';
-  if (styleT.length > 1000) return res.status(400).json({ error: 'Style trop long (max 1000).' });
 
   const { data, error } = await getUserClient(req)
     .from('characters')
-    .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT, style: styleT, is_public: is_publicB, category: categoryT })
+    .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT })
     .eq('id', id)
     .eq('creator_id', req.user.id)
     .select()

@@ -339,6 +339,34 @@
         </div>
 
         <div class="field-group">
+          <label class="field-label" for="field-style">Style d'ecriture</label>
+          <textarea class="field-textarea" id="field-style"
+            placeholder="Ex : reponses courtes, jamais de metaphores…" maxlength="1000"></textarea>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="field-category">Categorie</label>
+          <select class="field-input" id="field-category">
+            <option value="autre">Autre</option>
+            <option value="anime">Anime</option>
+            <option value="fantasy">Fantasy</option>
+            <option value="sci-fi">Sci-Fi</option>
+            <option value="historique">Historique</option>
+            <option value="original">Original</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="field-public">Visibilite</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="field-public" />
+            <span style="font-size:13px;color:var(--text-secondary);">
+              Personnage public — visible par tous
+            </span>
+          </label>
+        </div>
+
+        <div class="field-group">
           <label class="field-label" for="field-lore">Lore</label>
           <textarea class="field-textarea" id="field-lore" placeholder="Histoire, contexte, background…" maxlength="2000"></textarea>
         </div>
