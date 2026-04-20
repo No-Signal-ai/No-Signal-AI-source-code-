@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>No-Signal AI — Découvrir des personnages</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="discover-page">
+
+  <!-- Navigation -->
+  <nav class="discover-nav">
+    <a href="/discover.html" class="discover-nav-logo">◈ NO-SIGNAL</a>
+    <div class="discover-nav-auth">
+      <a href="/auth.html" class="btn-nav-link">Se connecter</a>
+      <a href="/auth.html" class="btn-nav-primary">Créer un compte</a>
+    </div>
+  </nav>
+
+  <!-- En-tête -->
+  <header class="discover-header">
+    <h1>Découvrir des personnages</h1>
+    <p>Explore la communauté et démarre un chat sans inscription.</p>
+  </header>
+
+  <!-- Contrôles : filtres catégorie + recherche -->
+  <div class="discover-controls">
+    <div id="category-chips" class="category-chips">
+      <button class="category-chip active" data-category="">Tous</button>
+      <button class="category-chip" data-category="anime">Anime</button>
+      <button class="category-chip" data-category="fantasy">Fantasy</button>
+      <button class="category-chip" data-category="sci-fi">Sci-Fi</button>
+      <button class="category-chip" data-category="historique">Historique</button>
+      <button class="category-chip" data-category="original">Original</button>
+      <button class="category-chip" data-category="autre">Autre</button>
+    </div>
+    <input
+      id="search-input"
+      class="discover-search"
+      type="search"
+      placeholder="Rechercher par nom..."
+    />
+  </div>
+
+  <!-- Grille des personnages -->
+  <main id="discover-grid" class="discover-grid">
+    <p id="discover-loading" class="discover-empty">Chargement...</p>
+  </main>
+
+  <script src="/config.js"></script>
+  <script src="/discover.js" type="module"></script>
+</body>
+</html>
