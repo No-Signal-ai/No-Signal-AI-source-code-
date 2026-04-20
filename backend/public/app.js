@@ -1440,7 +1440,7 @@ async function uploadFile(file) {
   const isImage = file.type.startsWith('image/');
   if (isImage && !state.modelVision[state.modelKey]) {
     const useVision = confirm(
-      `Le modèle actuel (${MODEL_DISPLAY_NAMES[state.modelKey]}) ne supporte pas les images.\nPasser sur STELLAR (Gemini) pour cette session ?`
+      `Le modèle actuel (${MODEL_DISPLAY_NAMES[state.modelKey]}) ne supporte pas les images.\nPasser sur STELLAR (vision) pour cette session ?`
     );
     if (!useVision) return;
     state.modelKey = 'stellar';
@@ -2030,6 +2030,134 @@ function initEvents() {
     const el = $('announce-input');
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// MODE INVITE — fonctions guest
+// ══════════════════════════════════════════════════════════
+
+function loadGuestMessages(charId) {
+  try {
+    const raw = localStorage.getItem('guest_chat_' + charId);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveGuestMessages(charId, messages) {
+  const trimmed = messages.length > 50 ? messages.slice(messages.length - 50) : messages;
+  localStorage.setItem('guest_chat_' + charId, JSON.stringify(trimmed));
+}
+
+async function sendGuestMessage(charId, guestMessages) {
+  const input = $('user-input');
+  const text = input.value.trim();
+  if (!text || state.isWaiting) return;
+
+  const userMsg = { role: 'user', content: text };
+  guestMessages.push(userMsg);
+  saveGuestMessages(charId, guestMessages);
+  appendMessage(userMsg, true, guestMessages.length - 1);
+
+  input.value = '';
+  autoResize();
+
+  state.isWaiting = true;
+  setInputEnabled(false);
+  showTypingIndicator();
+
+  try {
+    const res = await fetch(BACKEND_URL + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        character: state.activeCharacter,
+        messages: guestMessages,
+        summary: null,
+        userPersona: { name: '', desc: '' },
+        modelKey: state.modelKey,
+        sessionId: null,
+        attachedImageUrl: null,
+      }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let done = false;
+
+    while (!done) {
+      const { value, done: streamDone } = await reader.read();
+      done = streamDone;
+      if (value) {
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6);
+            if (dataStr === '[DONE]') { done = true; break; }
+            try {
+              const parsed = JSON.parse(dataStr);
+              fullContent += parsed.choices?.[0]?.delta?.content ?? '';
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      }
+    }
+
+    removeTypingIndicator();
+    const assistantMsg = { role: 'assistant', content: fullContent };
+    guestMessages.push(assistantMsg);
+    saveGuestMessages(charId, guestMessages);
+    appendMessage(assistantMsg, true, guestMessages.length - 1);
+  } catch (err) {
+    removeTypingIndicator();
+    appendMessage({ role: 'assistant', content: 'Erreur : ' + err.message }, true, guestMessages.length);
+  }
+
+  state.isWaiting = false;
+  setInputEnabled(true);
+  $('user-input').focus();
+}
+
+async function initGuestMode(charId) {
+  try {
+    const res = await fetch(BACKEND_URL + '/api/characters/public/' + charId);
+    if (!res.ok) { window.location.replace('/discover.html'); return; }
+    const char = await res.json();
+    state.activeCharacter = char;
+  } catch {
+    window.location.replace('/discover.html');
+    return;
+  }
+
+  // Masquer la sidebar
+  const leftNav = document.getElementById('left-nav');
+  const leftPanel = document.getElementById('left-panel');
+  if (leftNav) leftNav.style.display = 'none';
+  if (leftPanel) leftPanel.style.display = 'none';
+
+  // Afficher la banniere invite
+  const banner = document.getElementById('guest-banner');
+  if (banner) banner.classList.remove('hidden');
+
+  // Afficher le personnage dans la zone chat
+  renderActiveCharacter();
+
+  // Charger et afficher les messages depuis localStorage
+  const guestMessages = loadGuestMessages(charId);
+  guestMessages.forEach((msg, idx) => appendMessage(msg, false, idx));
+
+  // Activer le champ de saisie
+  setInputEnabled(true);
+
+  // Brancher les events d'envoi sur sendGuestMessage (override sendMessage)
+  $('btn-send').onclick = () => sendGuestMessage(charId, guestMessages);
+  $('user-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendGuestMessage(charId, guestMessages);
+    }
   });
 }
 
