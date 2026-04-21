@@ -169,11 +169,18 @@ async function requireAuth(req, res, next) {
 }
 
 // ── Optional auth middleware (guest-safe) ───────────────────
+// Comportement intentionnel : si le token est absent, invalide ou expiré,
+// on appelle next() sans req.user — la requête est traitée comme invitée.
+// C'est un choix de conception pour permettre l'accès sans compte.
+// Un token présent mais invalide est silencieusement ignoré (downgrade vers
+// invité). Si ce comportement doit changer, retourner 401 quand token est
+// présent mais invalide (voir WR-04 dans 02-REVIEW.md).
 async function optionalAuth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) { next(); return; }
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
   if (!error && user) req.user = user;
+  // Token invalide/expiré -> downgrade vers invité (pas de 401 ici, voir commentaire)
   next();
 }
 
