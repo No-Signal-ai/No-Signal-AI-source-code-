@@ -693,7 +693,7 @@ app.post('/api/characters', requireAuth, async (req, res) => {
     .eq('id', req.user.id)
     .single();
 
-  const { data, error } = await getUserClient(req)
+  const { data, error } = await supabaseAdmin
     .from('characters')
     .insert({ creator_id: req.user.id, creator_username: profile?.username ?? '', name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT, style: styleT, is_public: is_publicB, category: categoryT })
     .select()
@@ -728,7 +728,7 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
                        : 'autre';
   if (styleT.length > 1000) return res.status(400).json({ error: 'Style trop long (max 1000).' });
 
-  const { data, error } = await getUserClient(req)
+  const { data, error } = await supabaseAdmin
     .from('characters')
     .update({ name: name.trim(), personality: personalityT, tone: toneT, lore: loreT, avatar_url: avatar_urlT, style: styleT, is_public: is_publicB, category: categoryT })
     .eq('id', id)
