@@ -2158,12 +2158,12 @@ async function initGuestMode(charId) {
 
   // Brancher les events d'envoi sur sendGuestMessage (override sendMessage)
   $('btn-send').onclick = () => sendGuestMessage(charId, guestMessages);
-  $('user-input').addEventListener('keydown', e => {
+  $('user-input').onkeydown = e => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendGuestMessage(charId, guestMessages);
     }
-  });
+  };
 }
 
 // ══════════════════════════════════════════════════════════
